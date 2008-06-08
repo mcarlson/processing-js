@@ -53,8 +53,8 @@ var parse = Processing.parse = function parse( aCode, p ) {
   aCode = aCode.replace(/\.length\(\)/g, ".length");
 
   // foo( int foo, float bar )
-  aCode = aCode.replace(/([\(,]\s*)(\w+)((?:\[\])+| )\s*(\w+\s*[\),])/g, "$1$4");
-  aCode = aCode.replace(/([\(,]\s*)(\w+)((?:\[\])+| )\s*(\w+\s*[\),])/g, "$1$4");
+  aCode = aCode.replace(/([\(,]\s*)(\w+)\s+(\w+)\s*([\),])/g, "$1$3:$2$4");
+  aCode = aCode.replace(/([\(,]\s*)(\w+)\s+(\w+)\s*([\),])/g, "$1$3:$2$4");
 
   // float[] foo = new float[5];
   aCode = aCode.replace(/new (\w+)((?:\[([^\]]*)\])+)/g, function(all, name, args) {
@@ -73,12 +73,12 @@ var parse = Processing.parse = function parse( aCode, p ) {
     });
   }
 
-  // float foo = 5;
+  // float foo = 5 -> var foo:float = 5;
   aCode = aCode.replace(/(?:static )?(\w+)((?:\[\])+| ) *(\w+)\[?\]?(\s*[=,;])/g, function(all, type, arr, name, sep) {
     if ( type == "return" )
       return all;
     else
-      return "var " + name + sep;
+      return "var " + name + ':' + type + sep;
   });
 
   // Fix Array[] foo = {...} to [...]
@@ -94,32 +94,31 @@ var parse = Processing.parse = function parse( aCode, p ) {
   });
 
   // super() is a reserved word
-  aCode = aCode.replace(/super\(/g, "superMethod(");
+  //aCode = aCode.replace(/super\(/g, "superMethod(");
 
   var classes = ["int", "float", "boolean", "string"];
 
   function ClassReplace(all, name, extend, vars, last) {
     classes.push( name );
 
-    var static = "";
+    var _static = "";
 
     vars = vars.replace(/final\s+var\s+(\w+\s*=\s*.*?;)/g, function(all,set) {
-      static += " " + name + "." + set;
+      _static += " " + name + "." + set;
       return "";
     });
 
     // Move arguments up from constructor and wrap contents with
     // a with(this), and unwrap constructor
-    return "function " + name + "() {with(this){\n  " +
-      (extend ? "var __self=this;function superMethod(){extendClass(__self,arguments," + extend + ");}\n" : "") +
-      // Replace var foo = 0; with this.foo = 0;
-      // and force var foo; to become this.foo = null;
+    return "class " + name + 
+      (extend ? " extends " + extend : "") + " });" +
+      // Replace var foo = 0; with var foo = 0;
+      // and force var foo; to become var foo = null;
       vars
-        .replace(/,\s?/g, ";\n  this.")
-        .replace(/\b(var |final |public )+\s*/g, "this.")
+        .replace(/,\s?/g, ";\n  var ")
+        .replace(/\b(var |final |public )+\s*/g, "var ")
         .replace(/this.(\w+);/g, "this.$1 = null;") + 
-        (extend ? "extendClass(this, " + extend + ");\n" : "") +
-        "<CLASS " + name + " " + static + ">" + (typeof last == "string" ? last : name + "(");
+        "<CLASS " + name + " " + _static + ">" + (typeof last == "string" ? last : name + "(");
   }
 
   var matchClasses = /(?:public |abstract |static )*class (\w+)\s*(?:extends\s*(\w+)\s*)?{\s*((?:.|\n)*?)\b\1\s*\(/g;
@@ -145,7 +144,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
       if ( args[0].match(/^\s*$/) )
         args.shift();
       
-      var fn = "if ( arguments.length == " + args.length + " ) {\n";
+      var fn = "function " + className + "(" +args.join() + ") {\n    if ( arguments.length == " + args.length + " ) {\n";
         
       for ( var i = 0; i < args.length; i++ ) {
         fn += "    var " + args[i] + " = arguments[" + i + "];\n";
@@ -158,7 +157,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
     // this.collide = function() { ... }
     // and add closing } for with(this) ...
     rest = rest.replace(/(?:public )?Processing.\w+ = function (\w+)\((.*?)\)/g, function(all, name, args) {
-      return "ADDMETHOD(this, '" + name + "', function(" + args + ")";
+      return "ADDMETHOD" + name + " (" + args + ")";
     });
     
     var matchMethod = /ADDMETHOD([\s\S]*?{)/, mc;
@@ -169,7 +168,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
         allNext = RegExp.rightContext,
         next = nextBrace(allNext);
 
-      methods += "addMethod" + mc[1] + next + "});"
+      methods += "function " + mc[1] + next + "});"
       
       rest = prev + allNext.slice( next.length + 1 );
     }
@@ -233,6 +232,23 @@ var parse = Processing.parse = function parse( aCode, p ) {
     });
     return ret;
   }
+
+  aCode = aCode.replace(/(extends \w+) }\);/g, "$1 {\n  ");
+  aCode = aCode.replace(/(class \w+) }\);/g, "$1 {\n  ");
+  aCode = aCode.replace(/}\);function/g, "}\n  function");
+  // Clean up extra spaces after var
+  aCode = aCode.replace(/var  /g, "var ");
+  // rename top-level Processing methods
+  aCode = aCode.replace(/Processing.\w+\s*=\s*/g, "");
+
+  // 
+  var matchFirstClass = /([\w\W]+?)\s+class/m;
+  if (aCode.match(matchFirstClass)) {
+    aCode = aCode.replace(matchFirstClass, "$1\n}\n\nclass");
+  } else {
+    aCode = aCode + '}';
+  }
+  aCode = 'class ProcessingMain extends Processing {\n' + aCode;
 
 //log(aCode);
 
@@ -617,7 +633,7 @@ function buildProcessing( curElement ){
     }
   };
 
-  p.char = function char( key ) {
+  p._char = function _char( key ) {
     return key;
   };
 
@@ -1016,7 +1032,7 @@ function buildProcessing( curElement ){
     return Math.sqrt( aNumber );
   };
   
-  p.int = function int( aNumber ) {
+  p._int = function _int( aNumber ) {
     return Math.floor( aNumber );
   };
 
@@ -1036,13 +1052,13 @@ function buildProcessing( curElement ){
     return Math.floor( aNumber );
   };
 
-  p.float = function float( aNumber ) {
+  p._float = function _float( aNumber ) {
     return typeof aNumber == "string" ?
-      p.float( aNumber.charCodeAt(0) ) :
+      p._float( aNumber.charCodeAt(0) ) :
       parseFloat( aNumber );
   };
 
-  p.byte = function byte( aNumber ) {
+  p._byte = function _byte( aNumber ) {
     return aNumber || 0;
   };
   
