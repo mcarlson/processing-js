@@ -10,8 +10,8 @@
 class Processing {
   // init
   static var PI = Math.PI;
-  static var TWO_PI = 2 * Processing.PI;
-  static var HALF_PI = Processing.PI / 2;
+  static var TWO_PI = 2 * Math.PI;
+  static var HALF_PI = Math.PI / 2;
   static var P3D = 3;
   static var CORNER = 0;
   static var RADIUS = 1;
@@ -36,20 +36,20 @@ class Processing {
   static var RIGHT = 3;
 
   // "Private" variables used to maintain state
-  var curContext = curElement.getContext("2d");
+  var curContext = null;
   var doFill = true;
   var doStroke = true;
   var loopStarted = false;
   var hasBackground = false;
   var doLoop = true;
   var looping = 0;
-  var curRectMode = Processing.CORNER;
-  var curEllipseMode = Processing.CENTER;
+  var curRectMode = null;
+  var curEllipseMode = null;
   var inSetup = false;
   var inDraw = false;
   var curBackground = "rgba(204,204,204,1)";
   var curFrameRate = 1000;
-  var curShape = Processing.POLYGON;
+  var curShape = null;
   var curShapeCount = 0;
   var curvePoints = [];
   var curTightness = 0;
@@ -60,8 +60,13 @@ class Processing {
   var pathOpen = false;
   var mousePressed = false;
   var keyPressed = false;
-  var firstX, firstY, secondX, secondY, prevX, prevY;
-  var curColorMode = Processing.RGB;
+  var firstX
+  var firstY
+  var secondX
+  var secondY
+  var prevX
+  var prevY;
+  var curColorMode;
   var curTint = -1;
   var curTextSize = 12;
   var curTextFont = "Arial";
@@ -85,9 +90,19 @@ class Processing {
   static var draw = undefined;
   static var setup = undefined;
 
-  // The height/width of the canvas
-  static var width = curElement.width - 0;
-  static var height = curElement.height - 0;
+  var width = 0;
+  var height = 0;
+
+  function setConsts() {
+    // The height/width of the canvas
+    this.width = curElement.width;
+    this.height = curElement.height;
+    this.curContext = curElement.getContext("2d");
+    this.curRectMode = Processing.CORNER;
+    this.curEllipseMode = Processing.CENTER;
+    this.curShape = Processing.POLYGON;
+    this.curColorMode = Processing.RGB;
+  }
 
   // The current animation frame
   static var frameCount = 0;
@@ -1138,7 +1153,7 @@ class Processing {
   };
 
   function updatePixels () {
-    var colors = /(\d+),(\d+),(\d+),(\d+)/;
+    var colors = new RegExp('(d+),(\d+),(\d+),(\d+)');
     var pixels = {};
     pixels.width = this.width;
     pixels.height = this.height;
