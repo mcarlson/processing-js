@@ -7,284 +7,33 @@
  * More information: http://processing.org/
  */
 
-(function(){
-
-this.Processing = function Processing( aElement, aCode ) {
-  if ( typeof aElement == "string" )
-    aElement = document.getElementById( aElement );
-
-  var p = buildProcessing( aElement );
-
-  if ( aCode )
-    p.init( aCode );
-
-  return p;
-};
-
-function log() {
-  try {
-    console.log.apply( console, arguments );
-  } catch(e) {
-    try {
-      opera.postError.apply( opera, arguments );
-    } catch(e){}
-  }
-}
-
-var parse = Processing.parse = function parse( aCode, p ) {
-  // Angels weep at this parsing code :-(
-
-  // Remove end-of-line comments
-  aCode = aCode.replace(/\/\/ .*\n/g, "\n");
-
-  // Weird parsing errors with %
-  aCode = aCode.replace(/([^\s])%([^\s])/g, "$1 % $2");
- 
-  // Simple convert a function-like thing to function
-  aCode = aCode.replace(/(?:static )?(\w+ )(\w+)\s*(\([^\)]*\)\s*{)/g, function(all, type, name, args) {
-    if ( name == "if" || name == "for" || name == "while" ) {
-      return all;
-    } else {
-      return "Processing." + name + " = function " + name + args;
-    }
-  });
-
-  // Force .length() to be .length
-  aCode = aCode.replace(/\.length\(\)/g, ".length");
-
-  // foo( int foo, float bar )
-  aCode = aCode.replace(/([\(,]\s*)(\w+)\s+(\w+)\s*([\),])/g, "$1$3:$2$4");
-  aCode = aCode.replace(/([\(,]\s*)(\w+)\s+(\w+)\s*([\),])/g, "$1$3:$2$4");
-
-  // float[] foo = new float[5];
-  aCode = aCode.replace(/new (\w+)((?:\[([^\]]*)\])+)/g, function(all, name, args) {
-    return "new ArrayList(" + args.slice(1,-1).split("][").join(", ") + ")";
-  });
-  
-  aCode = aCode.replace(/(?:static )?\w+\[\]\s*(\w+)\[?\]?\s*=\s*{.*?};/g, function(all) {
-    return all.replace(/{/g, "[").replace(/}/g, "]");
-  });
-
-  // int|float foo;
-  var intFloat = /(\n\s*(?:int|float)(?:\[\])?(?:\s*|[^\(]*?,\s*))([a-z]\w*)(;|,)/i;
-  while ( intFloat.test(aCode) ) {
-    aCode = aCode.replace(new RegExp(intFloat), function(all, type, name, sep) {
-      return type + " " + name + " = 0" + sep;
-    });
-  }
-
-  // float foo = 5 -> var foo:float = 5;
-  aCode = aCode.replace(/(?:static )?(\w+)((?:\[\])+| ) *(\w+)\[?\]?(\s*[=,;])/g, function(all, type, arr, name, sep) {
-    if ( type == "return" )
-      return all;
-    else
-      return "var " + name + ':' + type + sep;
-  });
-
-  // Fix Array[] foo = {...} to [...]
-  aCode = aCode.replace(/=\s*{((.|\s)*?)};/g, function(all,data) {
-    return "= [" + data.replace(/{/g, "[").replace(/}/g, "]") + "]";
-  });
-  
-  // static { ... } blocks
-  aCode = aCode.replace(/static\s*{((.|\n)*?)}/g, function(all, init) {
-    // Convert the static definitons to variable assignments
-    //return init.replace(/\((.*?)\)/g, " = $1");
-    return init;
-  });
-
-  // super() is a reserved word
-  //aCode = aCode.replace(/super\(/g, "superMethod(");
-
-  var classes = ["int", "float", "boolean", "string"];
-
-  function ClassReplace(all, name, extend, vars, last) {
-    classes.push( name );
-
-    var _static = "";
-
-    vars = vars.replace(/final\s+var\s+(\w+\s*=\s*.*?;)/g, function(all,set) {
-      _static += " " + name + "." + set;
-      return "";
-    });
-
-    // Move arguments up from constructor and wrap contents with
-    // a with(this), and unwrap constructor
-    return "class " + name + 
-      (extend ? " extends " + extend : "") + " });" +
-      // Replace var foo = 0; with var foo = 0;
-      // and force var foo; to become var foo = null;
-      vars
-        .replace(/,\s?/g, ";\n  var ")
-        .replace(/\b(var |final |public )+\s*/g, "var ")
-        .replace(/this.(\w+);/g, "this.$1 = null;") + 
-        "<CLASS " + name + " " + _static + ">" + (typeof last == "string" ? last : name + "(");
-  }
-
-  var matchClasses = /(?:public |abstract |static )*class (\w+)\s*(?:extends\s*(\w+)\s*)?{\s*((?:.|\n)*?)\b\1\s*\(/g;
-  var matchNoCon = /(?:public |abstract |static )*class (\w+)\s*(?:extends\s*(\w+)\s*)?{\s*((?:.|\n)*?)(Processing)/g;
-  
-  aCode = aCode.replace(matchClasses, ClassReplace);
-  aCode = aCode.replace(matchNoCon, ClassReplace);
-
-  var matchClass = /<CLASS (\w+) (.*?)>/, m;
-  
-  while ( (m = aCode.match( matchClass )) ) {
-    var left = RegExp.leftContext,
-      allRest = RegExp.rightContext,
-      rest = nextBrace(allRest),
-      className = m[1],
-      staticVars = m[2] || "";
-      
-    allRest = allRest.slice( rest.length + 1 );
-
-    rest = rest.replace(new RegExp("\\b" + className + "\\(([^\\)]*?)\\)\\s*{", "g"), function(all, args) {
-      args = args.split(/,\s*?/);
-      
-      if ( args[0].match(/^\s*$/) )
-        args.shift();
-      
-      var fn = "function " + className + "(" +args.join() + ") {\n    if ( arguments.length == " + args.length + " ) {\n";
-        
-      for ( var i = 0; i < args.length; i++ ) {
-        fn += "    var " + args[i] + " = arguments[" + i + "];\n";
-      }
-        
-      return fn;
-    });
-    
-    // Fix class method names
-    // this.collide = function() { ... }
-    // and add closing } for with(this) ...
-    rest = rest.replace(/(?:public )?Processing.\w+ = function (\w+)\((.*?)\)/g, function(all, name, args) {
-      return "ADDMETHOD" + name + " (" + args + ")";
-    });
-    
-    var matchMethod = /ADDMETHOD([\s\S]*?{)/, mc;
-    var methods = "";
-    
-    while ( (mc = rest.match( matchMethod )) ) {
-      var prev = RegExp.leftContext,
-        allNext = RegExp.rightContext,
-        next = nextBrace(allNext);
-
-      methods += "function " + mc[1] + next + "});"
-      
-      rest = prev + allNext.slice( next.length + 1 );
-    }
-
-    rest = methods + rest;
-    
-    aCode = left + rest + "\n}}" + staticVars + allRest;
-  }
-
-  // Do some tidying up, where necessary
-  aCode = aCode.replace(/Processing.\w+ = function addMethod/g, "addMethod");
-  
-  function nextBrace( right ) {
-    var rest = right;
-    var position = 0;
-    var leftCount = 1, rightCount = 0;
-    
-    while ( leftCount != rightCount ) {
-      var nextLeft = rest.indexOf("{");
-      var nextRight = rest.indexOf("}");
-      
-      if ( nextLeft < nextRight && nextLeft != -1 ) {
-        leftCount++;
-        rest = rest.slice( nextLeft + 1 );
-        position += nextLeft + 1;
-      } else {
-        rightCount++;
-        rest = rest.slice( nextRight + 1 );
-        position += nextRight + 1;
-      }
-    }
-    
-    return right.slice(0, position - 1);
-  }
-
-  // Handle (int) Casting
-  aCode = aCode.replace(/\(int\)/g, "0|");
-
-  // Remove Casting
-  aCode = aCode.replace(new RegExp("\\((" + classes.join("|") + ")(\\[\\])?\\)", "g"), "");
-  
-  // Convert 3.0f to just 3.0
-  aCode = aCode.replace(/(\d+)f/g, "$1");
-
-  // Force numbers to exist
-  //aCode = aCode.replace(/([^.])(\w+)\s*\+=/g, "$1$2 = ($2||0) +");
-
-  // Force characters-as-bytes to work
-  aCode = aCode.replace(/('[a-zA-Z0-9]')/g, "$1.charCodeAt(0)");
-
-  // Convert #aaaaaa into color
-  aCode = aCode.replace(/#([a-f0-9]{6})/ig, function(m, hex){
-    var num = toNumbers(hex);
-    return "color(" + num[0] + "," + num[1] + "," + num[2] + ")";
-  });
-
-  function toNumbers( str ){
-    var ret = [];
-     str.replace(/(..)/g, function(str){
-      ret.push( parseInt( str, 16 ) );
-    });
-    return ret;
-  }
-
-  aCode = aCode.replace(/(extends \w+) }\);/g, "$1 {\n  ");
-  aCode = aCode.replace(/(class \w+) }\);/g, "$1 {\n  ");
-  aCode = aCode.replace(/}\);function/g, "}\n  function");
-  // Clean up extra spaces after var
-  aCode = aCode.replace(/var  /g, "var ");
-  // rename top-level Processing methods
-  aCode = aCode.replace(/Processing.\w+\s*=\s*/g, "");
-
-  // 
-  var matchFirstClass = /([\w\W]+?)\s+class/m;
-  if (aCode.match(matchFirstClass)) {
-    aCode = aCode.replace(matchFirstClass, "$1\n}\n\nclass");
-  } else {
-    aCode = aCode + '}';
-  }
-  aCode = 'class ProcessingMain extends Processing {\n' + aCode;
-
-//log(aCode);
-
-  return aCode;
-};
-
-function buildProcessing( curElement ){
-
-  var p = {};
-
+class Processing {
   // init
-  p.PI = Math.PI;
-  p.TWO_PI = 2 * p.PI;
-  p.HALF_PI = p.PI / 2;
-  p.P3D = 3;
-  p.CORNER = 0;
-  p.RADIUS = 1;
-  p.CENTER_RADIUS = 1;
-  p.CENTER = 2;
-  p.POLYGON = 2;
-  p.QUADS = 5;
-  p.TRIANGLES = 6;
-  p.POINTS = 7;
-  p.LINES = 8;
-  p.TRIANGLE_STRIP = 9;
-  p.TRIANGLE_FAN = 4;
-  p.QUAD_STRIP = 3;
-  p.CORNERS = 10;
-  p.CLOSE = true;
-  p.RGB = 1;
-  p.HSB = 2;
+  static var PI = Math.PI;
+  static var TWO_PI = 2 * Processing.PI;
+  static var HALF_PI = Processing.PI / 2;
+  static var P3D = 3;
+  static var CORNER = 0;
+  static var RADIUS = 1;
+  static var CENTER_RADIUS = 1;
+  static var CENTER = 2;
+  static var POLYGON = 2;
+  static var QUADS = 5;
+  static var TRIANGLES = 6;
+  static var POINTS = 7;
+  static var LINES = 8;
+  static var TRIANGLE_STRIP = 9;
+  static var TRIANGLE_FAN = 4;
+  static var QUAD_STRIP = 3;
+  static var CORNERS = 10;
+  static var CLOSE = true;
+  static var RGB = 1;
+  static var HSB = 2;
 
   // mouseButton constants: values adjusted to come directly from e.which
-  p.LEFT = 1;
-  p.CENTER = 2;
-  p.RIGHT = 3;
+  static var LEFT = 1;
+  static var CENTER = 2;
+  static var RIGHT = 3;
 
   // "Private" variables used to maintain state
   var curContext = curElement.getContext("2d");
@@ -294,13 +43,13 @@ function buildProcessing( curElement ){
   var hasBackground = false;
   var doLoop = true;
   var looping = 0;
-  var curRectMode = p.CORNER;
-  var curEllipseMode = p.CENTER;
+  var curRectMode = Processing.CORNER;
+  var curEllipseMode = Processing.CENTER;
   var inSetup = false;
   var inDraw = false;
   var curBackground = "rgba(204,204,204,1)";
   var curFrameRate = 1000;
-  var curShape = p.POLYGON;
+  var curShape = Processing.POLYGON;
   var curShapeCount = 0;
   var curvePoints = [];
   var curTightness = 0;
@@ -312,7 +61,7 @@ function buildProcessing( curElement ){
   var mousePressed = false;
   var keyPressed = false;
   var firstX, firstY, secondX, secondY, prevX, prevY;
-  var curColorMode = p.RGB;
+  var curColorMode = Processing.RGB;
   var curTint = -1;
   var curTextSize = 12;
   var curTextFont = "Arial";
@@ -320,41 +69,41 @@ function buildProcessing( curElement ){
   var start = (new Date).getTime();
 
   // Global vars for tracking mouse position
-  p.pmouseX = 0;
-  p.pmouseY = 0;
-  p.mouseX = 0;
-  p.mouseY = 0;
-  p.mouseButton = 0;
+  static var pmouseX = 0;
+  static var pmouseY = 0;
+  static var mouseX = 0;
+  static var mouseY = 0;
+  static var mouseButton = 0;
 
   // Will be replaced by the user, most likely
-  p.mouseDragged = undefined;
-  p.mouseMoved = undefined;
-  p.mousePressed = undefined;
-  p.mouseReleased = undefined;
-  p.keyPressed = undefined;
-  p.keyReleased = undefined;
-  p.draw = undefined;
-  p.setup = undefined;
+  static var mouseDragged = undefined;
+  static var mouseMoved = undefined;
+  static var mousePressed = undefined;
+  static var mouseReleased = undefined;
+  static var keyPressed = undefined;
+  static var keyReleased = undefined;
+  static var draw = undefined;
+  static var setup = undefined;
 
   // The height/width of the canvas
-  p.width = curElement.width - 0;
-  p.height = curElement.height - 0;
+  static var width = curElement.width - 0;
+  static var height = curElement.height - 0;
 
   // The current animation frame
-  p.frameCount = 0;
+  static var frameCount = 0;
   
   // In case I ever need to do HSV conversion:
   // http://srufaculty.sru.edu/david.dailey/javascript/js/5rml.js
-  p.color = function color( aValue1, aValue2, aValue3, aValue4 ) {
+  function color( aValue1, aValue2, aValue3, aValue4 ) {
     var aColor = "";
     
     if ( arguments.length == 3 ) {
-      aColor = p.color( aValue1, aValue2, aValue3, opacityRange );
+      aColor = color( aValue1, aValue2, aValue3, opacityRange );
     } else if ( arguments.length == 4 ) {
       var a = aValue4 / opacityRange;
       a = isNaN(a) ? 1 : a;
 
-      if ( curColorMode == p.HSB ) {
+      if ( curColorMode == Processing.HSB ) {
         var rgb = HSBtoRGB(aValue1, aValue2, aValue3);
         var r = rgb[0], g = rgb[1], b = rgb[2];
       } else {
@@ -373,11 +122,11 @@ function buildProcessing( curElement ){
         aColor = c.join(",");
       }
     } else if ( arguments.length == 2 ) {
-      aColor = p.color( aValue1, aValue1, aValue1, aValue2 );
+      aColor = color( aValue1, aValue1, aValue1, aValue2 );
     } else if ( typeof aValue1 == "number" ) {
-      aColor = p.color( aValue1, aValue1, aValue1, opacityRange );
+      aColor = color( aValue1, aValue1, aValue1, opacityRange );
     } else {
-      aColor = p.color( redRange, greenRange, blueRange, opacityRange );
+      aColor = color( redRange, greenRange, blueRange, opacityRange );
     }
 
     // HSB conversion function from Mootools, MIT Licensed
@@ -412,23 +161,23 @@ function buildProcessing( curElement ){
     return aColor;
   }
 
-  p.nf = function( num, pad ) {
+  function nf ( num, pad ) {
     var str = "" + num;
     while ( pad - str.length )
       str = "0" + str;
     return str;
   };
 
-  p.AniSprite = function( prefix, frames ) {
+  function AniSprite ( prefix, frames ) {
     this.images = [];
     this.pos = 0;
 
     for ( var i = 0; i < frames; i++ ) {
-      this.images.push( prefix + p.nf( i, ("" + frames).length ) + ".gif" );
+      this.images.push( prefix + this.nf( i, ("" + frames).length ) + ".gif" );
     }
 
     this.display = function( x, y ) {
-      p.image( this.images[ this.pos ], x, y );
+      this.image( this.images[ this.pos ], x, y );
 
       if ( ++this.pos >= frames )
         this.pos = 0;
@@ -445,7 +194,7 @@ function buildProcessing( curElement ){
 
   function buildImageObject( obj ) {
     var pixels = obj.data;
-    var data = p.createImage( obj.width, obj.height );
+    var data = this.createImage( obj.width, obj.height );
 
     if ( data.__defineGetter__ && data.__lookupGetter__ && !data.__lookupGetter__("pixels") ) {
       var pixelsDone;
@@ -456,7 +205,7 @@ function buildProcessing( curElement ){
         pixelsDone = [];
 
         for ( var i = 0; i < pixels.length; i += 4 ) {
-          pixelsDone.push( p.color(pixels[i], pixels[i+1], pixels[i+2], pixels[i+3]) );
+          pixelsDone.push( this.color(pixels[i], pixels[i+1], pixels[i+2], pixels[i+3]) );
         }
 
         return pixelsDone;
@@ -465,14 +214,14 @@ function buildProcessing( curElement ){
       data.pixels = [];
 
       for ( var i = 0; i < pixels.length; i += 4 ) {
-        data.pixels.push( p.color(pixels[i], pixels[i+1], pixels[i+2], pixels[i+3]) );
+        data.pixels.push( this.color(pixels[i], pixels[i+1], pixels[i+2], pixels[i+3]) );
       }
     }
 
     return data;
   }
 
-  p.createImage = function createImage( w, h, mode ) {
+  function createImage( w, h, mode ) {
     var data = {};
     data.width = w;
     data.height = h;
@@ -496,7 +245,7 @@ function buildProcessing( curElement ){
     return data;
   };
 
-  p.createGraphics = function createGraphics( w, h ) {
+  function createGraphics( w, h ) {
     var canvas = document.createElement("canvas");
     var ret = buildProcessing( canvas );
     ret.size( w, h );
@@ -504,11 +253,11 @@ function buildProcessing( curElement ){
     return ret;
   };
 
-  p.beginDraw = function beginDraw(){};
+  function beginDraw(){};
 
-  p.endDraw = function endDraw(){};
+  function endDraw(){};
 
-  p.tint = function tint( rgb, a ) {
+  function tint( rgb, a ) {
     curTint = a;
   };
 
@@ -541,7 +290,7 @@ function buildProcessing( curElement ){
     return canvas;
   }
 
-  p.image = function image( img, x, y, w, h ) {
+  function image( img, x, y, w, h ) {
     x = x || 0;
     y = y || 0;
 
@@ -565,18 +314,18 @@ function buildProcessing( curElement ){
     if ( img._mask ) {
       var oldComposite = curContext.globalCompositeOperation;
       curContext.globalCompositeOperation = "darker";
-      p.image( img._mask, x, y );
+      this.image( img._mask, x, y );
       curContext.globalCompositeOperation = oldComposite;
     }
   };
 
-  p.exit = function exit() {
+  function exit() {
     clearInterval(looping);
   };
 
-  p.save = function save( file ){};
+  function save( file ){};
 
-  p.loadImage = function loadImage( file ) {
+  function loadImage( file ) {
     var img = document.getElementById(file);
     if ( !img )
       return;
@@ -594,7 +343,7 @@ function buildProcessing( curElement ){
     return data;
   };
 
-  p.loadFont = function loadFont( name ) {
+  function loadFont( name ) {
     return {
       name: name,
       width: function( str ) {
@@ -608,20 +357,20 @@ function buildProcessing( curElement ){
     };
   };
 
-  p.textFont = function textFont( name, size ) {
+  function textFont( name, size ) {
     curTextFont = name;
-    p.textSize( size );
+    this.textSize( size );
   };
 
-  p.textSize = function textSize( size ) {
+  function textSize( size ) {
     if ( size ) {
       curTextSize = size;
     }
   };
 
-  p.textAlign = function textAlign(){};
+  function textAlign(){};
 
-  p.text = function text( str, x, y ) {
+  function text( str, x, y ) {
     if ( str && curContext.mozDrawText ) {
       curContext.save();
       curContext.mozTextStyle = curTextSize + "px " + curTextFont.name;
@@ -633,13 +382,13 @@ function buildProcessing( curElement ){
     }
   };
 
-  p._char = function _char( key ) {
+  function _char( key ) {
     return key;
   };
 
-  p.println = function println(){};
+  function println(){};
 
-  p.map = function map( value, istart, istop, ostart, ostop ) {
+  function map( value, istart, istop, ostart, ostop ) {
     return ostart + (ostop - ostart) * ((value - istart) / (istop - istart));
   };
 
@@ -647,7 +396,7 @@ function buildProcessing( curElement ){
     return this.replace(new RegExp(re, "g"), replace);
   };
 
-  p.Point = function Point( x, y ) {
+  function Point( x, y ) {
     this.x = x;
     this.y = y;
     this.copy = function() {
@@ -655,7 +404,7 @@ function buildProcessing( curElement ){
     }
   };
 
-  p.Random = function() {
+  function Random () {
     var haveNextNextGaussian = false;
     var nextNextGaussian;
 
@@ -667,8 +416,8 @@ function buildProcessing( curElement ){
       } else {
         var v1, v2, s;
         do { 
-          v1 = 2 * p.random(1) - 1;   // between -1.0 and 1.0
-          v2 = 2 * p.random(1) - 1;   // between -1.0 and 1.0
+          v1 = 2 * this.random(1) - 1;   // between -1.0 and 1.0
+          v2 = 2 * this.random(1) - 1;   // between -1.0 and 1.0
           s = v1 * v1 + v2 * v2;
         } while (s >= 1 || s == 0);
         var multiplier = Math.sqrt(-2 * Math.log(s)/s);
@@ -680,7 +429,7 @@ function buildProcessing( curElement ){
     };
   };
 
-  p.ArrayList = function ArrayList( size, size2, size3 ) {
+  function ArrayList( size, size2, size3 ) {
     var array = new Array( 0 | size );
     
     if ( size2 ) {
@@ -729,7 +478,7 @@ function buildProcessing( curElement ){
     return array;
   };
   
-  p.colorMode = function colorMode( mode, range1, range2, range3, range4 ) {
+  function colorMode( mode, range1, range2, range3, range4 ) {
     curColorMode = mode;
 
     if ( arguments.length >= 4 ) {
@@ -743,17 +492,17 @@ function buildProcessing( curElement ){
     }
 
     if ( arguments.length == 2 ) {
-      p.colorMode( mode, range1, range1, range1, range1 );
+      this.colorMode( mode, range1, range1, range1, range1 );
     }
   };
   
-  p.beginShape = function beginShape( type ) {
+  function beginShape( type ) {
     curShape = type;
     curShapeCount = 0; 
     curvePoints = [];
   };
   
-  p.endShape = function endShape( close ) {
+  function endShape( close ) {
     if ( curShapeCount != 0 ) {
       if ( close || doFill ) 
       curContext.lineTo( firstX, firstY );
@@ -782,24 +531,24 @@ function buildProcessing( curElement ){
     }
   };
   
-  p.vertex = function vertex( x, y, x2, y2, x3, y3 ) {
-    if ( curShapeCount == 0 && curShape != p.POINTS ) {
+  function vertex( x, y, x2, y2, x3, y3 ) {
+    if ( curShapeCount == 0 && curShape != Processing.POINTS ) {
       pathOpen = true;
       curContext.beginPath();
       curContext.moveTo( x, y );
       firstX = x;
       firstY = y;
     } else {
-      if ( curShape == p.POINTS ) {
-        p.point( x, y );
+      if ( curShape == Processing.POINTS ) {
+        this.point( x, y );
       } else if ( arguments.length == 2 ) {
-        if ( curShape != p.QUAD_STRIP || curShapeCount != 2 )
+        if ( curShape != Processing.QUAD_STRIP || curShapeCount != 2 )
           curContext.lineTo( x, y );
 
-        if ( curShape == p.TRIANGLE_STRIP ) {
+        if ( curShape == Processing.TRIANGLE_STRIP ) {
           if ( curShapeCount == 2 ) {
             // finish shape
-            p.endShape(p.CLOSE);
+            this.endShape(Processing.CLOSE);
             pathOpen = true;
             curContext.beginPath();
             
@@ -812,9 +561,9 @@ function buildProcessing( curElement ){
           firstY = prevY;
         }
 
-        if ( curShape == p.TRIANGLE_FAN && curShapeCount == 2 ) {
+        if ( curShape == Processing.TRIANGLE_FAN && curShapeCount == 2 ) {
           // finish shape
-          p.endShape(p.CLOSE);
+          this.endShape(Processing.CLOSE);
           pathOpen = true;
           curContext.beginPath();
       
@@ -824,10 +573,10 @@ function buildProcessing( curElement ){
           curShapeCount = 1;
         }
     
-        if ( curShape == p.QUAD_STRIP && curShapeCount == 3 ) {
+        if ( curShape == Processing.QUAD_STRIP && curShapeCount == 3 ) {
           // finish shape
           curContext.lineTo( prevX, prevY );
-          p.endShape(p.CLOSE);
+          this.endShape(Processing.CLOSE);
           pathOpen = true;
           curContext.beginPath();
     
@@ -837,7 +586,7 @@ function buildProcessing( curElement ){
           curShapeCount = 1;
         }
 
-        if ( curShape == p.QUAD_STRIP) {
+        if ( curShape == Processing.QUAD_STRIP) {
           firstX = secondX;
           firstY = secondY;
           secondX = prevX;
@@ -859,14 +608,14 @@ function buildProcessing( curElement ){
     prevY = y;
     curShapeCount++;
     
-    if ( curShape == p.LINES && curShapeCount == 2 ||
-         (curShape == p.TRIANGLES) && curShapeCount == 3 ||
-     (curShape == p.QUADS) && curShapeCount == 4 ) {
-      p.endShape(p.CLOSE);
+    if ( curShape == Processing.LINES && curShapeCount == 2 ||
+         (curShape == Processing.TRIANGLES) && curShapeCount == 3 ||
+     (curShape == Processing.QUADS) && curShapeCount == 4 ) {
+      this.endShape(Processing.CLOSE);
     }
   };
 
-  p.curveVertex = function( x, y, x2, y2 ) {
+  function curveVertex ( x, y, x2, y2 ) {
     if ( curvePoints.length < 3 ) {
       curvePoints.push([x,y]);
     } else {
@@ -889,107 +638,107 @@ function buildProcessing( curElement ){
       b[3] = [curvePoints[2][0],curvePoints[2][1]];
 
       if ( !pathOpen ) {
-        p.vertex( b[0][0], b[0][1] );
+        this.vertex( b[0][0], b[0][1] );
       } else {
         curShapeCount = 1;
       }
 
-      p.vertex( b[1][0], b[1][1], b[2][0], b[2][1], b[3][0], b[3][1] );
+      this.vertex( b[1][0], b[1][1], b[2][0], b[2][1], b[3][0], b[3][1] );
       curvePoints.shift();
     }
   };
 
-  p.curveTightness = function( tightness ) {
+  function curveTightness ( tightness ) {
     curTightness = tightness;
   };
 
-  p.bezierVertex = p.vertex;
+  this.bezierVertex = this.vertex;
   
-  p.rectMode = function rectMode( aRectMode ) {
+  function rectMode( aRectMode ) {
     curRectMode = aRectMode;
   };
 
-  p.imageMode = function(){};
+  function imageMode (){};
   
-  p.ellipseMode = function ellipseMode( aEllipseMode ) {
+  function ellipseMode( aEllipseMode ) {
     curEllipseMode = aEllipseMode;
   };
   
-  p.dist = function dist( x1, y1, x2, y2 ) {
+  function dist( x1, y1, x2, y2 ) {
     return Math.sqrt( Math.pow( x2 - x1, 2 ) + Math.pow( y2 - y1, 2 ) );
   };
 
-  p.year = function year() {
+  function year() {
     return (new Date).getYear() + 1900;
   };
 
-  p.month = function month() {
+  function month() {
     return (new Date).getMonth();
   };
 
-  p.day = function day() {
+  function day() {
     return (new Date).getDay();
   };
 
-  p.hour = function hour() {
+  function hour() {
     return (new Date).getHours();
   };
 
-  p.minute = function minute() {
+  function minute() {
     return (new Date).getMinutes();
   };
 
-  p.second = function second() {
+  function second() {
     return (new Date).getSeconds();
   };
 
-  p.millis = function millis() {
+  function millis() {
     return (new Date).getTime() - start;
   };
   
-  p.ortho = function ortho(){};
+  function ortho(){};
   
-  p.translate = function translate( x, y ) {
+  function translate( x, y ) {
     curContext.translate( x, y );
   };
   
-  p.scale = function scale( x, y ) {
+  function scale( x, y ) {
     curContext.scale( x, y || x );
   };
   
-  p.rotate = function rotate( aAngle ) {
+  function rotate( aAngle ) {
     curContext.rotate( aAngle );
   };
   
-  p.pushMatrix = function pushMatrix() {
+  function pushMatrix() {
     curContext.save();
   };
   
-  p.popMatrix = function popMatrix() {
+  function popMatrix() {
     curContext.restore();
   };
   
-  p.redraw = function redraw() {
+  function redraw() {
     if ( hasBackground ) {
-      p.background();
+      this.background();
     }
 
-    p.frameCount++;
+    this.frameCount++;
     
     inDraw = true;
-    p.pushMatrix();
-    p.draw();
-    p.popMatrix();
+    this.pushMatrix();
+    this.draw();
+    this.popMatrix();
     inDraw = false;
   };
   
-  p.loop = function loop() {
+  function loop() {
     if ( loopStarted )
       return;
     
     looping = setInterval(function() {
       try {
-        p.redraw();
+        this.redraw();
       }
       catch(e) {
         clearInterval( looping );
@@ -1000,76 +749,76 @@ function buildProcessing( curElement ){
     loopStarted = true;
   };
   
-  p.frameRate = function frameRate( aRate ) {
+  function frameRate( aRate ) {
     curFrameRate = aRate;
   };
   
-  p.background = function background( img ) {
+  function background( img ) {
     if ( arguments.length ) {
       if ( img && img.img ) {
         curBackground = img;
       } else {
-        curBackground = p.color.apply( this, arguments );
+        curBackground = this.color.apply( this, arguments );
       }
     }
     
 
     if ( curBackground.img ) {
-      p.image( curBackground, 0, 0 );
+      this.image( curBackground, 0, 0 );
     } else {
       var oldFill = curContext.fillStyle;
       curContext.fillStyle = curBackground + "";
-      curContext.fillRect( 0, 0, p.width, p.height );
+      curContext.fillRect( 0, 0, this.width, this.height );
       curContext.fillStyle = oldFill;
     }
   };
 
-  p.sq = function sq( aNumber ) {
+  function sq( aNumber ) {
     return aNumber * aNumber;
   };
 
-  p.sqrt = function sqrt( aNumber ) {
+  function sqrt( aNumber ) {
     return Math.sqrt( aNumber );
   };
   
-  p._int = function _int( aNumber ) {
+  function _int( aNumber ) {
     return Math.floor( aNumber );
   };
 
-  p.min = function min( aNumber, aNumber2 ) {
+  function min( aNumber, aNumber2 ) {
     return Math.min( aNumber, aNumber2 );
   };
 
-  p.max = function max( aNumber, aNumber2 ) {
+  function max( aNumber, aNumber2 ) {
     return Math.max( aNumber, aNumber2 );
   };
 
-  p.ceil = function ceil( aNumber ) {
+  function ceil( aNumber ) {
     return Math.ceil( aNumber );
   };
 
-  p.floor = function floor( aNumber ) {
+  function floor( aNumber ) {
     return Math.floor( aNumber );
   };
 
-  p._float = function _float( aNumber ) {
+  function _float( aNumber ) {
     return typeof aNumber == "string" ?
-      p._float( aNumber.charCodeAt(0) ) :
+      this._float( aNumber.charCodeAt(0) ) :
       parseFloat( aNumber );
   };
 
-  p._byte = function _byte( aNumber ) {
+  function _byte( aNumber ) {
     return aNumber || 0;
   };
   
-  p.random = function random( aMin, aMax ) {
+  function random( aMin, aMax ) {
     return arguments.length == 2 ?
       aMin + (Math.random() * (aMax - aMin)) :
       Math.random() * aMin;
   };
 
   // From: http://freespace.virgin.net/hugo.elias/models/m_perlin.htm
-  p.noise = function( x, y, z ) {
+  function noise ( x, y, z ) {
     return arguments.length >= 2 ?
       PerlinNoise_2D( x, y ) :
       PerlinNoise_2D( x, x );
@@ -1122,122 +871,122 @@ function buildProcessing( curElement ){
   }
 
   function Interpolate(a, b, x) {
-    var ft = x * p.PI;
-    var f = (1 - p.cos(ft)) * .5;
+    var ft = x * Processing.PI;
+    var f = (1 - this.cos(ft)) * .5;
     return  a*(1-f) + b*f;
   }
 
-  p.red = function( aColor ) {
+  function red ( aColor ) {
     return parseInt(aColor.slice(5));
   };
 
-  p.green = function( aColor ) {
+  function green ( aColor ) {
     return parseInt(aColor.split(",")[1]);
   };
 
-  p.blue = function( aColor ) {
+  function blue ( aColor ) {
     return parseInt(aColor.split(",")[2]);
   };
 
-  p.alpha = function( aColor ) {
+  function alpha ( aColor ) {
     return parseInt(aColor.split(",")[3]);
   };
 
-  p.abs = function abs( aNumber ) {
+  function abs( aNumber ) {
     return Math.abs( aNumber );
   };
   
-  p.cos = function cos( aNumber ) {
+  function cos( aNumber ) {
     return Math.cos( aNumber );
   };
   
-  p.sin = function sin( aNumber ) {
+  function sin( aNumber ) {
     return Math.sin( aNumber );
   };
   
-  p.pow = function pow( aNumber, aExponent ) {
+  function pow( aNumber, aExponent ) {
     return Math.pow( aNumber, aExponent );
   };
   
-  p.constrain = function constrain( aNumber, aMin, aMax ) {
+  function constrain( aNumber, aMin, aMax ) {
     return Math.min( Math.max( aNumber, aMin ), aMax );
   };
   
-  p.sqrt = function sqrt( aNumber ) {
+  function sqrt( aNumber ) {
     return Math.sqrt( aNumber );
   };
   
-  p.atan2 = function atan2( aNumber, aNumber2 ) {
+  function atan2( aNumber, aNumber2 ) {
     return Math.atan2( aNumber, aNumber2 );
   };
   
-  p.radians = function radians( aAngle ) {
-    return ( aAngle / 180 ) * p.PI;
+  function radians( aAngle ) {
+    return ( aAngle / 180 ) * Processing.PI;
   };
   
-  p.size = function size( aWidth, aHeight ) {
+  function size( aWidth, aHeight ) {
     var fillStyle = curContext.fillStyle;
     var strokeStyle = curContext.strokeStyle;
 
-    curElement.width = p.width = aWidth;
-    curElement.height = p.height = aHeight;
+    curElement.width = this.width = aWidth;
+    curElement.height = this.height = aHeight;
 
     curContext.fillStyle = fillStyle;
     curContext.strokeStyle = strokeStyle;
   };
   
-  p.noStroke = function noStroke() {
+  function noStroke() {
     doStroke = false;
   };
   
-  p.noFill = function noFill() {
+  function noFill() {
     doFill = false;
   };
   
-  p.smooth = function smooth(){};
+  function smooth(){};
   
-  p.noLoop = function noLoop() {
+  function noLoop() {
     doLoop = false;
   };
   
-  p.fill = function fill() {
+  function fill() {
     doFill = true;
-    curContext.fillStyle = p.color.apply( this, arguments );
+    curContext.fillStyle = this.color.apply( this, arguments );
   };
   
-  p.stroke = function stroke() {
+  function stroke() {
     doStroke = true;
-    curContext.strokeStyle = p.color.apply( this, arguments );
+    curContext.strokeStyle = this.color.apply( this, arguments );
   };
 
-  p.strokeWeight = function strokeWeight( w ) {
+  function strokeWeight( w ) {
     curContext.lineWidth = w;
   };
   
-  p.point = function point( x, y ) {
+  function point( x, y ) {
     var oldFill = curContext.fillStyle;
     curContext.fillStyle = curContext.strokeStyle;
     curContext.fillRect( Math.round( x ), Math.round( y ), 1, 1 );
     curContext.fillStyle = oldFill;
   };
 
-  p.get = function get( x, y ) {
+  function get( x, y ) {
     if ( arguments.length == 0 ) {
-      var c = p.createGraphics( p.width, p.height );
+      var c = this.createGraphics( this.width, this.height );
       c.image( curContext, 0, 0 );
       return c;
     }
 
     if ( !getLoaded ) {
-      getLoaded = buildImageObject( curContext.getImageData(0, 0, p.width, p.height) );
+      getLoaded = buildImageObject( curContext.getImageData(0, 0, this.width, this.height) );
     }
 
     return getLoaded.get( x, y );
   };
 
-  p.set = function set( x, y, obj ) {
+  function set( x, y, obj ) {
     if ( obj && obj.img ) {
-      p.image( obj, x, y );
+      this.image( obj, x, y );
     } else {
       var oldFill = curContext.fillStyle;
       var color = obj;
@@ -1247,11 +996,11 @@ function buildProcessing( curElement ){
     }
   };
   
-  p.arc = function arc( x, y, width, height, start, stop ) {
+  function arc( x, y, width, height, start, stop ) {
     if ( width <= 0 )
       return;
 
-    if ( curEllipseMode == p.CORNER ) {
+    if ( curEllipseMode == Processing.CORNER ) {
       x += width / 2;
       y += height / 2;
     }
@@ -1259,7 +1008,7 @@ function buildProcessing( curElement ){
     curContext.beginPath();
   
     curContext.moveTo( x, y );
-    curContext.arc( x, y, curEllipseMode == p.CENTER_RADIUS ? width : width/2, start, stop, false );
+    curContext.arc( x, y, curEllipseMode == Processing.CENTER_RADIUS ? width : width/2, start, stop, false );
     
     if ( doFill )
       curContext.fill();
@@ -1270,7 +1019,7 @@ function buildProcessing( curElement ){
     curContext.closePath();
   };
   
-  p.line = function line( x1, y1, x2, y2 ) {
+  function line( x1, y1, x2, y2 ) {
     curContext.lineCap = "round";
     curContext.beginPath();
   
@@ -1282,7 +1031,7 @@ function buildProcessing( curElement ){
     curContext.closePath();
   };
 
-  p.bezier = function bezier( x1, y1, x2, y2, x3, y3, x4, y4 ) {
+  function bezier( x1, y1, x2, y2, x3, y3, x4, y4 ) {
     curContext.lineCap = "butt";
     curContext.beginPath();
   
@@ -1294,24 +1043,24 @@ function buildProcessing( curElement ){
     curContext.closePath();
   };
 
-  p.triangle = function triangle( x1, y1, x2, y2, x3, y3 ) {
-    p.beginShape();
-    p.vertex( x1, y1 );
-    p.vertex( x2, y2 );
-    p.vertex( x3, y3 );
-    p.endShape();
+  function triangle( x1, y1, x2, y2, x3, y3 ) {
+    this.beginShape();
+    this.vertex( x1, y1 );
+    this.vertex( x2, y2 );
+    this.vertex( x3, y3 );
+    this.endShape();
   };
 
-  p.quad = function quad( x1, y1, x2, y2, x3, y3, x4, y4 ) {
-    p.beginShape();
-    p.vertex( x1, y1 );
-    p.vertex( x2, y2 );
-    p.vertex( x3, y3 );
-    p.vertex( x4, y4 );
-    p.endShape();
+  function quad( x1, y1, x2, y2, x3, y3, x4, y4 ) {
+    this.beginShape();
+    this.vertex( x1, y1 );
+    this.vertex( x2, y2 );
+    this.vertex( x3, y3 );
+    this.vertex( x4, y4 );
+    this.endShape();
   };
   
-  p.rect = function rect( x, y, width, height ) {
+  function rect( x, y, width, height ) {
     if ( width == 0 && height == 0 )
       return;
 
@@ -1320,17 +1069,17 @@ function buildProcessing( curElement ){
     var offsetStart = 0;
     var offsetEnd = 0;
 
-    if ( curRectMode == p.CORNERS ) {
+    if ( curRectMode == Processing.CORNERS ) {
       width -= x;
       height -= y;
     }
     
-    if ( curRectMode == p.RADIUS ) {
+    if ( curRectMode == Processing.RADIUS ) {
       width *= 2;
       height *= 2;
     }
     
-    if ( curRectMode == p.CENTER || curRectMode == p.RADIUS ) {
+    if ( curRectMode == Processing.CENTER || curRectMode == Processing.RADIUS ) {
       x -= width / 2;
       y -= height / 2;
     }
@@ -1351,7 +1100,7 @@ function buildProcessing( curElement ){
     curContext.closePath();
   };
   
-  p.ellipse = function ellipse( x, y, width, height ) {
+  function ellipse( x, y, width, height ) {
     x = x || 0;
     y = y || 0;
 
@@ -1360,7 +1109,7 @@ function buildProcessing( curElement ){
 
     curContext.beginPath();
     
-    if ( curEllipseMode == p.RADIUS ) {
+    if ( curEllipseMode == Processing.RADIUS ) {
       width *= 2;
       height *= 2;
     }
@@ -1380,30 +1129,30 @@ function buildProcessing( curElement ){
     curContext.closePath();
   };
 
-  p.link = function( href, target ) {
+  function link ( href, target ) {
     window.location = href;
   };
 
-  p.loadPixels = function() {
-    p.pixels = buildImageObject( curContext.getImageData(0, 0, p.width, p.height) ).pixels;
+  function loadPixels () {
+    this.pixels = buildImageObject( curContext.getImageData(0, 0, this.width, this.height) ).pixels;
   };
 
-  p.updatePixels = function() {
+  function updatePixels () {
     var colors = /(\d+),(\d+),(\d+),(\d+)/;
     var pixels = {};
-    pixels.width = p.width;
-    pixels.height = p.height;
+    pixels.width = this.width;
+    pixels.height = this.height;
     pixels.data = [];
 
     if ( curContext.createImageData ) {
-      pixels = curContext.createImageData( p.width, p.height );
+      pixels = curContext.createImageData( this.width, this.height );
     }
 
     var data = pixels.data;
     var pos = 0;
 
-    for ( var i = 0, l = p.pixels.length; i < l; i++ ) {
-      var c = (p.pixels[i] || "rgba(0,0,0,1)").match(colors);
+    for ( var i = 0, l = this.pixels.length; i < l; i++ ) {
+      var c = (this.pixels[i] || "rgba(0,0,0,1)").match(colors);
       data[pos] = parseInt(c[1]);
       data[pos+1] = parseInt(c[2]);
       data[pos+2] = parseInt(c[3]);
@@ -1414,7 +1163,7 @@ function buildProcessing( curElement ){
     curContext.putImageData(pixels, 0, 0);
   };
 
-  p.extendClass = function extendClass( obj, args, fn ) {
+  function extendClass( obj, args, fn ) {
     if ( arguments.length == 3 ) {
       fn.apply( obj, args );
     } else {
@@ -1422,7 +1171,7 @@ function buildProcessing( curElement ){
     }
   };
 
-  p.addMethod = function addMethod( object, name, fn ) {
+  function addMethod( object, name, fn ) {
     if ( object[ name ] ) {
       var args = fn.length;
       
@@ -1438,9 +1187,9 @@ function buildProcessing( curElement ){
     }
   };
 
-  p.init = function init(code){
-    p.stroke( 0 );
-    p.fill( 255 );
+  function init(code){
+    this.stroke( 0 );
+    this.fill( 255 );
   
     // Canvas has trouble rendering single pixel stuff on whole-pixel
     // counts, so we slightly offset it (this is super lame).
@@ -1452,46 +1201,46 @@ function buildProcessing( curElement ){
       }})(p);
     }
   
-    if ( p.setup ) {
+    if ( this.setup ) {
       inSetup = true;
-      p.setup();
+      this.setup();
     }
     
     inSetup = false;
     
-    if ( p.draw ) {
+    if ( this.draw ) {
       if ( !doLoop ) {
-        p.redraw();
+        this.redraw();
       } else {
-        p.loop();
+        this.loop();
       }
     }
     
     attach( curElement, "mousemove", function(e) {
       var scrollX = window.scrollX != null ? window.scrollX : window.pageXOffset;
       var scrollY = window.scrollY != null ? window.scrollY : window.pageYOffset;
-      p.pmouseX = p.mouseX;
-      p.pmouseY = p.mouseY;
-      p.mouseX = e.clientX - curElement.offsetLeft + scrollX;
-      p.mouseY = e.clientY - curElement.offsetTop + scrollY;
+      this.pmouseX = this.mouseX;
+      this.pmouseY = this.mouseY;
+      this.mouseX = e.clientX - curElement.offsetLeft + scrollX;
+      this.mouseY = e.clientY - curElement.offsetTop + scrollY;
 
-      if ( p.mouseMoved ) {
-        p.mouseMoved();
+      if ( this.mouseMoved ) {
+        this.mouseMoved();
       }      
 
-      if ( mousePressed && p.mouseDragged ) {
-        p.mouseDragged();
+      if ( mousePressed && this.mouseDragged ) {
+        this.mouseDragged();
       }      
     });
     
     attach( curElement, "mousedown", function(e) {
       mousePressed = true;
-      p.mouseButton = e.which;
+      this.mouseButton = e.which;
 
-      if ( typeof p.mousePressed == "function" ) {
-        p.mousePressed();
+      if ( typeof this.mousePressed == "function" ) {
+        this.mousePressed();
       } else {
-        p.mousePressed = true;
+        this.mousePressed = true;
       }
     });
 
@@ -1503,40 +1252,40 @@ function buildProcessing( curElement ){
     attach( curElement, "mouseup", function(e) {
       mousePressed = false;
 
-      if ( typeof p.mousePressed != "function" ) {
-        p.mousePressed = false;
+      if ( typeof this.mousePressed != "function" ) {
+        this.mousePressed = false;
       }
 
-      if ( p.mouseReleased ) {
-        p.mouseReleased();
+      if ( this.mouseReleased ) {
+        this.mouseReleased();
       }
     });
 
     attach( document, "keydown", function(e) {
       keyPressed = true;
 
-      p.key = e.keyCode + 32;
+      this.key = e.keyCode + 32;
 
       if ( e.shiftKey ) {
-        p.key = String.fromCharCode(p.key).toUpperCase().charCodeAt(0);
+        this.key = String.fromCharCode(this.key).toUpperCase().charCodeAt(0);
       }
 
-      if ( typeof p.keyPressed == "function" ) {
-        p.keyPressed();
+      if ( typeof this.keyPressed == "function" ) {
+        this.keyPressed();
       } else {
-        p.keyPressed = true;
+        this.keyPressed = true;
       }
     });
 
     attach( document, "keyup", function(e) {
       keyPressed = false;
 
-      if ( typeof p.keyPressed != "function" ) {
-        p.keyPressed = false;
+      if ( typeof this.keyPressed != "function" ) {
+        this.keyPressed = false;
       }
 
-      if ( p.keyReleased ) {
-        p.keyReleased();
+      if ( this.keyReleased ) {
+        this.keyReleased();
       }
     });
 
@@ -1547,8 +1296,4 @@ function buildProcessing( curElement ){
         elem.attachEvent( "on" + type, fn );
     }
   };
-
-  return p;
 }
-
-})();
