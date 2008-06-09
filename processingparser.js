@@ -265,6 +265,14 @@ var parse = Processing.parse = function parse( aCode, p ) {
   // new ArrayList(...) -> new ArrayList(...).array
   aCode = aCode.replace(/(new\s+ArrayList[^\)]+?\))/mg, "$1.array");
 
+  var rename = ['int', 'float'];
+
+  for (var i = 0; i < rename.length; i++) {
+     var name = rename[i];
+     var findrename = new RegExp('([ =])(' + name + '\s*?\\()', 'g');
+     aCode = aCode.replace(findrename, "$1_$2");
+  }
+
   // Add top-level class declaration 
   aCode = 'class ProcessingMain extends Processing {\n' + aCode;
 
