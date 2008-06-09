@@ -5,20 +5,20 @@ var arm:SpinArm;
 function setup() 
 {
   #pragma 'withThis'
-  this.size(200, 200);
-  this.smooth();
-  this.arm = new SpinArm(this.width/2, this.height/2, 0.01);
-  this.spots = new SpinSpots(this.width/2, this.height/2, -0.02, 33.0);
+  size(200, 200);
+  smooth();
+  arm = new SpinArm(width/2, height/2, 0.01);
+  spots = new SpinSpots(width/2, height/2, -0.02, 33.0);
 }
 
 function draw() 
 {
   #pragma 'withThis'
-  this.background(204);
-  this.arm.update();
-  this.arm.display();
-  this.spots.update();
-  this.spots.display();
+  background(204);
+  arm.update();
+  arm.display();
+  spots.update();
+  spots.display();
 }
 }
 
@@ -28,13 +28,14 @@ class Spin extends Processing {
   var speed = 0;
   var angle:float = 0.0;
   function update () {
-  #pragma 'withThis'
-    angle += speed;
+    #pragma 'withThis'
+  angle += speed;
   }
   function Spin(xpos:float, ypos:float, s:float) {
-  #pragma 'withThis'
-    this.curContext = processingcontext.curContext;
-    this.color = processingcontext.color;
+#pragma 'withThis'
+  this.curContext = processingcontext.curContext;
+this.color = processingcontext.color;
+
     if ( arguments.length == 3 ) {
 
     x = xpos;
@@ -47,8 +48,8 @@ class Spin extends Processing {
 
 class SpinArm extends Spin {
   function display () {
-  #pragma 'withThis'
-    strokeWeight(1);
+    #pragma 'withThis'
+  strokeWeight(1);
     stroke(0);
     pushMatrix();
     translate(x, y);
@@ -58,8 +59,8 @@ class SpinArm extends Spin {
     popMatrix();
   }
   function SpinArm(x:float, y:float, s:float) {
-  #pragma 'withThis'
-    if ( arguments.length == 3 ) {
+    #pragma 'withThis'
+  if ( arguments.length == 3 ) {
 
     super(x, y, s);
   }
@@ -70,8 +71,8 @@ class SpinArm extends Spin {
 class SpinSpots extends Spin {
   var dim:float = 0;
   function display () {
-  #pragma 'withThis'
-    noStroke();
+    #pragma 'withThis'
+  noStroke();
     pushMatrix();
     translate(x, y);
     angle += speed;
@@ -81,8 +82,8 @@ class SpinSpots extends Spin {
     popMatrix();
   }
   function SpinSpots(x:float, y:float, s:float, d:float) {
-  #pragma 'withThis'
-    if ( arguments.length == 4 ) {
+    #pragma 'withThis'
+  if ( arguments.length == 4 ) {
 
     super(x, y, s);
     dim = d;
@@ -92,3 +93,4 @@ class SpinSpots extends Spin {
 }}
 
 var processingcontext = new ProcessingMain();
+

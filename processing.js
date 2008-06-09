@@ -9,31 +9,31 @@
 
 class Processing {
   // init
-  static var PI = Math.PI;
-  static var TWO_PI = 2 * Math.PI;
-  static var HALF_PI = Math.PI / 2;
-  static var P3D = 3;
-  static var CORNER = 0;
-  static var RADIUS = 1;
-  static var CENTER_RADIUS = 1;
-  static var CENTER = 2;
-  static var POLYGON = 2;
-  static var QUADS = 5;
-  static var TRIANGLES = 6;
-  static var POINTS = 7;
-  static var LINES = 8;
-  static var TRIANGLE_STRIP = 9;
-  static var TRIANGLE_FAN = 4;
-  static var QUAD_STRIP = 3;
-  static var CORNERS = 10;
-  static var CLOSE = true;
-  static var RGB = 1;
-  static var HSB = 2;
+  var PI = Math.PI;
+  var TWO_PI = 2 * Math.PI;
+  var HALF_PI = Math.PI / 2;
+  var P3D = 3;
+  var CORNER = 0;
+  var RADIUS = 1;
+  var CENTER_RADIUS = 1;
+  var CENTER = 2;
+  var POLYGON = 2;
+  var QUADS = 5;
+  var TRIANGLES = 6;
+  var POINTS = 7;
+  var LINES = 8;
+  var TRIANGLE_STRIP = 9;
+  var TRIANGLE_FAN = 4;
+  var QUAD_STRIP = 3;
+  var CORNERS = 10;
+  var CLOSE = true;
+  var RGB = 1;
+  var HSB = 2;
 
   // mouseButton constants: values adjusted to come directly from e.which
-  static var LEFT = 1;
-  static var CENTER = 2;
-  static var RIGHT = 3;
+  var LEFT = 1;
+  var CENTER = 2;
+  var RIGHT = 3;
 
   // "Private" variables used to maintain state
   var curElement = null
@@ -99,10 +99,10 @@ class Processing {
     this.width = this.curElement.width;
     this.height = this.curElement.height;
     this.curContext = this.curElement.getContext("2d");
-    this.curRectMode = Processing.CORNER;
-    this.curEllipseMode = Processing.CENTER;
-    this.curShape = Processing.POLYGON;
-    this.curColorMode = Processing.RGB;
+    this.curRectMode = this.CORNER;
+    this.curEllipseMode = this.CENTER;
+    this.curShape = this.POLYGON;
+    this.curColorMode = this.RGB;
     //Debug.write('setConsts', this, this.curContext);
   }
 
@@ -482,23 +482,23 @@ class Processing {
   };
   
   function vertex( x, y, x2, y2, x3, y3 ) {
-    if ( curShapeCount == 0 && curShape != Processing.POINTS ) {
+    if ( curShapeCount == 0 && curShape != this.POINTS ) {
       pathOpen = true;
       this.curContext.beginPath();
       this.curContext.moveTo( x, y );
       firstX = x;
       firstY = y;
     } else {
-      if ( curShape == Processing.POINTS ) {
+      if ( curShape == this.POINTS ) {
         this.point( x, y );
       } else if ( arguments.length == 2 ) {
-        if ( curShape != Processing.QUAD_STRIP || curShapeCount != 2 )
+        if ( curShape != this.QUAD_STRIP || curShapeCount != 2 )
           this.curContext.lineTo( x, y );
 
-        if ( curShape == Processing.TRIANGLE_STRIP ) {
+        if ( curShape == this.TRIANGLE_STRIP ) {
           if ( curShapeCount == 2 ) {
             // finish shape
-            this.endShape(Processing.CLOSE);
+            this.endShape(this.CLOSE);
             pathOpen = true;
             this.curContext.beginPath();
             
@@ -511,9 +511,9 @@ class Processing {
           firstY = prevY;
         }
 
-        if ( curShape == Processing.TRIANGLE_FAN && curShapeCount == 2 ) {
+        if ( curShape == this.TRIANGLE_FAN && curShapeCount == 2 ) {
           // finish shape
-          this.endShape(Processing.CLOSE);
+          this.endShape(this.CLOSE);
           pathOpen = true;
           this.curContext.beginPath();
       
@@ -523,10 +523,10 @@ class Processing {
           curShapeCount = 1;
         }
     
-        if ( curShape == Processing.QUAD_STRIP && curShapeCount == 3 ) {
+        if ( curShape == this.QUAD_STRIP && curShapeCount == 3 ) {
           // finish shape
           this.curContext.lineTo( prevX, prevY );
-          this.endShape(Processing.CLOSE);
+          this.endShape(this.CLOSE);
           pathOpen = true;
           this.curContext.beginPath();
     
@@ -536,7 +536,7 @@ class Processing {
           curShapeCount = 1;
         }
 
-        if ( curShape == Processing.QUAD_STRIP) {
+        if ( curShape == this.QUAD_STRIP) {
           firstX = secondX;
           firstY = secondY;
           secondX = prevX;
@@ -558,10 +558,10 @@ class Processing {
     prevY = y;
     curShapeCount++;
     
-    if ( curShape == Processing.LINES && curShapeCount == 2 ||
-         (curShape == Processing.TRIANGLES) && curShapeCount == 3 ||
-     (curShape == Processing.QUADS) && curShapeCount == 4 ) {
-      this.endShape(Processing.CLOSE);
+    if ( curShape == this.LINES && curShapeCount == 2 ||
+         (curShape == this.TRIANGLES) && curShapeCount == 3 ||
+     (curShape == this.QUADS) && curShapeCount == 4 ) {
+      this.endShape(this.CLOSE);
     }
   };
 
@@ -823,7 +823,7 @@ class Processing {
   }
 
   function Interpolate(a, b, x) {
-    var ft = x * Processing.PI;
+    var ft = x * this.PI;
     var f = (1 - this.cos(ft)) * .5;
     return  a*(1-f) + b*f;
   }
@@ -873,7 +873,7 @@ class Processing {
   };
   
   function radians( aAngle ) {
-    return ( aAngle / 180 ) * Processing.PI;
+    return ( aAngle / 180 ) * this.PI;
   };
   
   function size( aWidth, aHeight ) {
@@ -956,7 +956,7 @@ class Processing {
     if ( width <= 0 )
       return;
 
-    if ( this.curEllipseMode == Processing.CORNER ) {
+    if ( this.curEllipseMode == this.CORNER ) {
       x += width / 2;
       y += height / 2;
     }
@@ -964,7 +964,7 @@ class Processing {
     this.curContext.beginPath();
   
     this.curContext.moveTo( x, y );
-    this.curContext.arc( x, y, this.curEllipseMode == Processing.CENTER_RADIUS ? width : width/2, start, stop, false );
+    this.curContext.arc( x, y, this.curEllipseMode == this.CENTER_RADIUS ? width : width/2, start, stop, false );
     
     if ( doFill )
       this.curContext.fill();
@@ -1025,17 +1025,17 @@ class Processing {
     var offsetStart = 0;
     var offsetEnd = 0;
 
-    if ( curRectMode == Processing.CORNERS ) {
+    if ( curRectMode == this.CORNERS ) {
       width -= x;
       height -= y;
     }
     
-    if ( curRectMode == Processing.RADIUS ) {
+    if ( curRectMode == this.RADIUS ) {
       width *= 2;
       height *= 2;
     }
     
-    if ( curRectMode == Processing.CENTER || curRectMode == Processing.RADIUS ) {
+    if ( curRectMode == this.CENTER || curRectMode == this.RADIUS ) {
       x -= width / 2;
       y -= height / 2;
     }
@@ -1065,7 +1065,7 @@ class Processing {
 
     this.curContext.beginPath();
     
-    if ( this.curEllipseMode == Processing.RADIUS ) {
+    if ( this.curEllipseMode == this.RADIUS ) {
       width *= 2;
       height *= 2;
     }
@@ -1282,8 +1282,8 @@ class Processing {
       var a = aValue4 / this.owner.opacityRange;
       a = isNaN(a) ? 1 : a;
 
-      if ( this.owner.curColorMode == Processing.HSB ) {
-        var rgb = HSBtoRGB(aValue1, aValue2, aValue3);
+      if ( this.owner.curColorMode == this.HSB ) {
+        var rgb = this.HSBtoRGB(aValue1, aValue2, aValue3);
         var r = rgb[0], g = rgb[1], b = rgb[2];
       } else {
         var r = this.getColor(aValue1, this.owner.redRange);

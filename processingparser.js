@@ -100,6 +100,8 @@ var parse = Processing.parse = function parse( aCode, p ) {
 
   function ClassReplace(all, name, extend, vars, last) {
     classes.push( name );
+    // Default class
+    if (! extend) extend = 'Processing';
 
     var _static = "";
 
@@ -238,19 +240,33 @@ var parse = Processing.parse = function parse( aCode, p ) {
   aCode = aCode.replace(/(extends \w+) }\);/g, "$1 {\n  ");
   aCode = aCode.replace(/(class \w+) }\);/g, "$1 {\n  ");
   aCode = aCode.replace(/}\);function/g, "}\n  function");
+
   // Clean up extra spaces after var
   aCode = aCode.replace(/var  /g, "var ");
   // rename top-level Processing methods
   aCode = aCode.replace(/Processing.\w+\s*=\s*/g, "");
 
-  // 
-  var matchFirstClass = /([\w\W]+?)\s+class/m;
-  if (aCode.match(matchFirstClass)) {
-    aCode = aCode.replace(matchFirstClass, "$1\n}\n\nclass");
+  // Find end of top-level class declaration   
+  var matchFirstClass = /([\w\W]+?)\s+class\s+(\w+)/m;
+  if (result = aCode.match(matchFirstClass)) {
+    aCode = aCode.replace(matchFirstClass, "$1\n}\n\nclass $2");
+
+    // point to global context
+    var firstclassname = result[2];
+    var findfirstclassconstructor = new RegExp('(function.+?' + firstclassname + '[^\{]+?\{)', 'm');
+    aCode = aCode.replace(findfirstclassconstructor, "$1\nthis.curContext = processingcontext.curContext;\nthis.color = processingcontext.color;\n");
   } else {
     aCode = aCode + '}';
   }
+
+  // Add #pragma 'withThis' to functions
+  aCode = aCode.replace(/(function[^\{]+?\{\s+)/mg, "$1#pragma 'withThis'\n  ");
+
+  // Add top-level class declaration 
   aCode = 'class ProcessingMain extends Processing {\n' + aCode;
+
+  // Add global instance
+  aCode = aCode + '\nvar processingcontext = new ProcessingMain();\n';
 
 //log(aCode);
 
