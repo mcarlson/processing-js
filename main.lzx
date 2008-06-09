@@ -1,0 +1,9 @@
+<canvas>
+    <script src="processing.js" when="immediate"/>
+    <script src="test.js" when="immediate"/>
+    <drawview width="100" height="200">
+        <handler name="oncontext">
+            processingcontext.begin(this);
+        </handler>
+    </drawview>
+</canvas>
