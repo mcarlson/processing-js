@@ -379,54 +379,7 @@ class Processing {
     };
   };
 
-  function ArrayList( size, size2, size3 ) {
-    var array = new Array( 0 | size );
-    
-    if ( size2 ) {
-      for ( var i = 0; i < size; i++ ) {
-        array[i] = [];
 
-        for ( var j = 0; j < size2; j++ ) {
-          var a = array[i][j] = size3 ? new Array( size3 ) : 0;
-          for ( var k = 0; k < size3; k++ ) {
-            a[k] = 0;
-          }
-        }
-      }
-    } else {
-      for ( var i = 0; i < size; i++ ) {
-        array[i] = 0;
-      }
-    }
-    
-    array.size = function() {
-      return this.length;
-    };
-    array.get = function( i ) {
-      return this[ i ];
-    };
-    array.remove = function( i ) {
-      return this.splice( i, 1 );
-    };
-    array.add = function( item ) {
-      return this.push( item );
-    };
-    array.clone = function() {
-      var a = new ArrayList( size );
-      for ( var i = 0; i < size; i++ ) {
-        a[ i ] = this[ i ];
-      }
-      return a;
-    };
-    array.isEmpty = function() {
-      return !this.length;
-    };
-    array.clear = function() {
-      this.length = 0;
-    };
-    
-    return array;
-  };
   
   function colorMode( mode, range1, range2, range3, range4 ) {
     this.curColorMode = mode;
@@ -1260,6 +1213,11 @@ class Processing {
     }
     */
   }
+
+  function bind(processingcontext) {
+    this.curContext = processingcontext.curContext;
+    this.color = processingcontext.color;
+  }
 }
 
   // In case I ever need to do HSV conversion:
@@ -1338,4 +1296,55 @@ class Processing {
     function getColor( aValue, range ) {
       return Math.round(255 * (aValue / range));
     }
+}
+
+class ArrayList {
+    function ArrayList( size, size2, size3 ) {
+    var array = new Array( 0 | size );
+    
+    if ( size2 ) {
+      for ( var i = 0; i < size; i++ ) {
+        array[i] = [];
+
+        for ( var j = 0; j < size2; j++ ) {
+          var a = array[i][j] = size3 ? new Array( size3 ) : 0;
+          for ( var k = 0; k < size3; k++ ) {
+            a[k] = 0;
+          }
+        }
+      }
+    } else {
+      for ( var i = 0; i < size; i++ ) {
+        array[i] = 0;
+      }
+    }
+    
+    array.size = function() {
+      return this.length;
+    };
+    array.get = function( i ) {
+      return this[ i ];
+    };
+    array.remove = function( i ) {
+      return this.splice( i, 1 );
+    };
+    array.add = function( item ) {
+      return this.push( item );
+    };
+    array.clone = function() {
+      var a = new ArrayList( size );
+      for ( var i = 0; i < size; i++ ) {
+        a[ i ] = this[ i ];
+      }
+      return a;
+    };
+    array.isEmpty = function() {
+      return !this.length;
+    };
+    array.clear = function() {
+      this.length = 0;
+    };
+    
+    return array;
+  };
 }

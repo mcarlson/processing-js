@@ -254,7 +254,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
     // point to global context
     var firstclassname = result[2];
     var findfirstclassconstructor = new RegExp('(function.+?' + firstclassname + '[^\{]+?\{)', 'm');
-    aCode = aCode.replace(findfirstclassconstructor, "$1\nthis.curContext = processingcontext.curContext;\nthis.color = processingcontext.color;\n");
+    aCode = aCode.replace(findfirstclassconstructor, "$1\nthis.bind(processingcontext);\n");
   } else {
     aCode = aCode + '}';
   }
