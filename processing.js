@@ -32,10 +32,14 @@ class Processing {
 
   // mouseButton constants: values adjusted to come directly from e.which
   var LEFT = 1;
-  var CENTER = 2;
+  // see above var CENTER = 2;
   var RIGHT = 3;
 
   // "Private" variables used to maintain state
+  var curContext = null
+  var images = null
+  var pos = null
+  var display = null
   var curElement = null
   var doFill = true;
   var doStroke = true;
@@ -555,7 +559,9 @@ class Processing {
     curTightness = tightness;
   };
 
-  this.bezierVertex = this.vertex;
+  function bezierVertex() {
+    return this.vertex.apply(this, arguments);
+  }
   
   function rectMode( aRectMode ) {
     curRectMode = aRectMode;
@@ -815,10 +821,6 @@ class Processing {
   
   function constrain( aNumber, aMin, aMax ) {
     return Math.min( Math.max( aNumber, aMin ), aMax );
-  };
-  
-  function sqrt( aNumber ) {
-    return Math.sqrt( aNumber );
   };
   
   function atan2( aNumber, aNumber2 ) {
@@ -1220,9 +1222,9 @@ class Processing {
   }
 }
 
-  // In case I ever need to do HSV conversion:
-  // http://srufaculty.sru.edu/david.dailey/javascript/js/5rml.js
-  class ProcessingColor {
+// In case I ever need to do HSV conversion:
+// http://srufaculty.sru.edu/david.dailey/javascript/js/5rml.js
+class ProcessingColor {
     var owner = null;
     function ProcessingColor( scope ) {
         this.owner = scope;
@@ -1299,8 +1301,10 @@ class Processing {
 }
 
 class ArrayList {
-    function ArrayList( size, size2, size3 ) {
-    var array = new Array( 0 | size );
+  var array = null;
+
+  function ArrayList( size, size2, size3 ) {
+    this.array = array = new Array( 0 | size );
     
     if ( size2 ) {
       for ( var i = 0; i < size; i++ ) {
@@ -1344,7 +1348,5 @@ class ArrayList {
     array.clear = function() {
       this.length = 0;
     };
-    
-    return array;
   };
 }

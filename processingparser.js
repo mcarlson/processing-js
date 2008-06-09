@@ -262,6 +262,9 @@ var parse = Processing.parse = function parse( aCode, p ) {
   // Add #pragma 'withThis' to functions
   aCode = aCode.replace(/(function[^\{]+?\{\s+)/mg, "$1#pragma 'withThis'\n  ");
 
+  // new ArrayList(...) -> new ArrayList(...).array
+  aCode = aCode.replace(/(new\s+ArrayList[^\)]+?\))/mg, "$1.array");
+
   // Add top-level class declaration 
   aCode = 'class ProcessingMain extends Processing {\n' + aCode;
 
