@@ -121,6 +121,7 @@ class Processing {
     return str;
   };
 
+/*
   function AniSprite ( prefix, frames ) {
     this.images = [];
     this.pos = 0;
@@ -205,6 +206,7 @@ class Processing {
     ret.canvas = canvas;
     return ret;
   };
+*/
 
   function beginDraw(){};
 
@@ -214,6 +216,7 @@ class Processing {
     curTint = a;
   };
 
+/*
   function getImage( img ) {
     if ( typeof img == "string" ) {
       return document.getElementById(img);
@@ -271,13 +274,15 @@ class Processing {
       this.curContext.globalCompositeOperation = oldComposite;
     }
   };
+  */
 
   function exit() {
-    clearInterval(looping);
+    LzTimeKernel.clearInterval(looping);
   };
 
   function save( file ){};
 
+/*
   function loadImage( file ) {
     var img = document.getElementById(file);
     if ( !img )
@@ -295,6 +300,7 @@ class Processing {
     data.img = img;
     return data;
   };
+*/
 
   function loadFont( name ) {
     return {
@@ -349,38 +355,7 @@ class Processing {
     return this.replace(new RegExp(re, "g"), replace);
   };
 
-  function Point( x, y ) {
-    this.x = x;
-    this.y = y;
-    this.copy = function() {
-      return new Point( x, y );
-    }
-  };
 
-  function Random () {
-    var haveNextNextGaussian = false;
-    var nextNextGaussian;
-
-    this.nextGaussian = function() {
-      if (haveNextNextGaussian) {
-        haveNextNextGaussian = false;
-
-        return nextNextGaussian;
-      } else {
-        var v1, v2, s;
-        do { 
-          v1 = 2 * this.random(1) - 1;   // between -1.0 and 1.0
-          v2 = 2 * this.random(1) - 1;   // between -1.0 and 1.0
-          s = v1 * v1 + v2 * v2;
-        } while (s >= 1 || s == 0);
-        var multiplier = Math.sqrt(-2 * Math.log(s)/s);
-        nextNextGaussian = v2 * multiplier;
-        haveNextNextGaussian = true;
-
-        return v1 * multiplier;
-      }
-    };
-  };
 
 
   
@@ -437,7 +412,14 @@ class Processing {
     }
   };
   
-  function vertex( x, y, x2, y2, x3, y3 ) {
+  function vertex( ...args ) {
+    var x = args[0];
+    var y = args[1];
+    var x2 = args[2];
+    var y2 = args[3];
+    var x3 = args[4];
+    var y3 = args[5];
+
     if ( curShapeCount == 0 && curShape != this.POINTS ) {
       pathOpen = true;
       this.curContext.beginPath();
@@ -447,7 +429,7 @@ class Processing {
     } else {
       if ( curShape == this.POINTS ) {
         this.point( x, y );
-      } else if ( arguments.length == 2 ) {
+      } else if ( args.length == 2 ) {
         if ( curShape != this.QUAD_STRIP || curShapeCount != 2 )
           this.curContext.lineTo( x, y );
 
@@ -498,13 +480,13 @@ class Processing {
           secondX = prevX;
           secondY = prevY;
         }
-      } else if ( arguments.length == 4 ) {
+      } else if ( args.length == 4 ) {
         if ( curShapeCount > 1 ) {
           this.curContext.moveTo( prevX, prevY );
           this.curContext.quadraticCurveTo( firstX, firstY, x, y );
           curShapeCount = 1;
         }
-      } else if ( arguments.length == 6 ) {
+      } else if ( args.length == 6 ) {
         this.curContext.bezierCurveTo( x, y, x2, y2, x3, y3 );
         curShapeCount = -1;
       }
@@ -651,7 +633,7 @@ class Processing {
         self.redraw();
       }
       catch(e) {
-        clearInterval( looping );
+        LzTimeKernel.clearInterval( looping );
         throw e;
       }
     }, 1000 / this.curFrameRate );
@@ -663,17 +645,18 @@ class Processing {
     this.curFrameRate = aRate;
   };
   
-  function background( img ) {
-    if ( arguments.length ) {
-      if ( img && img.img ) {
+  function background( ...args ) {
+    if ( args.length ) {
+      var img = args[0];  
+      if ( img && img['img'] ) {
         curBackground = img;
       } else {
-        curBackground = this.color.setValue( arguments );
+        curBackground = this.color.setValue( args );
       }
     }
     
 
-    if ( curBackground.img ) {
+    if ( curBackground['img'] ) {
       this.image( curBackground, 0, 0 );
     } else {
       var oldFill = this.curContext.fillStyle;
@@ -953,20 +936,20 @@ class Processing {
   };
 
   function triangle( x1, y1, x2, y2, x3, y3 ) {
-    this.beginShape();
+    this.beginShape(null);
     this.vertex( x1, y1 );
     this.vertex( x2, y2 );
     this.vertex( x3, y3 );
-    this.endShape();
+    this.endShape(null);
   };
 
   function quad( x1, y1, x2, y2, x3, y3, x4, y4 ) {
-    this.beginShape();
+    this.beginShape(null);
     this.vertex( x1, y1 );
     this.vertex( x2, y2 );
     this.vertex( x3, y3 );
     this.vertex( x4, y4 );
-    this.endShape();
+    this.endShape(null);
   };
   
   function rect( x, y, width, height ) {
@@ -1349,3 +1332,40 @@ class ArrayList {
     return this;
   };
 }
+
+class Point {
+    var x;
+    var y;
+    function Point(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+    function copy() {
+      return new Point( x, y );
+    }
+};
+
+class Random {
+    var haveNextNextGaussian = false;
+    var nextNextGaussian;
+
+    function nextNextGaussian() {
+      if (haveNextNextGaussian) {
+        haveNextNextGaussian = false;
+
+        return nextNextGaussian;
+      } else {
+        var v1, v2, s;
+        do { 
+          v1 = 2 * this.random(1) - 1;   // between -1.0 and 1.0
+          v2 = 2 * this.random(1) - 1;   // between -1.0 and 1.0
+          s = v1 * v1 + v2 * v2;
+        } while (s >= 1 || s == 0);
+        var multiplier = Math.sqrt(-2 * Math.log(s)/s);
+        nextNextGaussian = v2 * multiplier;
+        haveNextNextGaussian = true;
+
+        return v1 * multiplier;
+      }
+    };
+};
