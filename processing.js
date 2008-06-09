@@ -102,16 +102,15 @@ class Processing {
     // The height/width of the canvas
     this.width = this.curElement.width;
     this.height = this.curElement.height;
-    this.curContext = this.curElement.getContext("2d");
+    this.curContext = this.curElement;
     this.curRectMode = this.CORNER;
     this.curEllipseMode = this.CENTER;
     this.curShape = this.POLYGON;
     this.curColorMode = this.RGB;
-    //Debug.write('setConsts', this, this.curContext);
   }
 
   // The current animation frame
-  static var frameCount = 0;
+  var frameCount = 0;
   
 
 
@@ -832,7 +831,6 @@ class Processing {
   };
   
   function size( aWidth, aHeight ) {
-    Debug.write('size', aWidth, aHeight);
     var fillStyle = this.curContext.fillStyle;
     var strokeStyle = this.curContext.strokeStyle;
 
@@ -1242,7 +1240,7 @@ class ProcessingColor {
       var a = aValue4 / this.owner.opacityRange;
       a = isNaN(a) ? 1 : a;
 
-      if ( this.owner.curColorMode == this.HSB ) {
+      if ( this.owner.curColorMode == this.owner.HSB ) {
         var rgb = this.HSBtoRGB(aValue1, aValue2, aValue3);
         var r = rgb[0], g = rgb[1], b = rgb[2];
       } else {
@@ -1348,5 +1346,6 @@ class ArrayList {
     array.clear = function() {
       this.length = 0;
     };
+    return this;
   };
 }
