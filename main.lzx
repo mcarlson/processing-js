@@ -1,25 +1,28 @@
-<canvas width="100%" height="600">
+<canvas title="processing for openlaszlo" width="100%" height="600">
     <include href="processing.lzx"/>
 
-    <processing name="bar" width="300" height="300">
-        <attribute name="num" value="20" type="number"/>
-        <attribute name="c" value="0" type="number"/>
+    <processing width="300" height="300">
         <method name="setup">
-            size(200,200);
-            fill(255);
-            frameRate(30);
+            //size(200, 200);
+            noStroke();
+            smooth();
+            drawCircle(100, 100, 80, 8);
         </method>
-        <method name="draw">
+        <method name="drawCircle" args="x:number, y:number, radius:number, level:number">
             <![CDATA[
-            background(0);
-            c+=0.1;
-            for(var i:number=1; i<height/num; i++) { 
-                var x:number = (c % i)*i*i;
-                stroke(102);
-                line(0, i*num, x, i*num);
-                noStroke();
-                rect(x, i*num-num/2, 8, num);
-            } 
+            var tt:number = 126 * level/6.0;
+            fill(tt, 153);
+            ellipse(x, y, radius*2, radius*2);      
+            if(level > 1) {
+                level = level - 1;
+                var num:number = _int(random(2, 6));
+                for(var i:number=0; i<num; i++) {
+                    var a:number = random(0, TWO_PI);
+                    var nx:number = x + cos(a) * 6.0 * level;
+                    var ny:number = y + sin(a) * 6.0 * level;
+                    drawCircle(nx, ny, radius/2, level);
+                }
+            }
             ]]>
         </method>
     </processing>

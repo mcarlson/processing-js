@@ -45,7 +45,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
     if ( name == "if" || name == "for" || name == "while" ) {
       return all;
     } else {
-      return "Processing." + name + " = function " + name + args;
+      return "Processing." + name + " = <method " + name + args;
     }
   });
 
@@ -74,11 +74,11 @@ var parse = Processing.parse = function parse( aCode, p ) {
   }
 
   // float foo = 5 -> var foo:float = 5;
-  aCode = aCode.replace(/(?:static )?(\w+)((?:\[\])+| ) *(\w+)\[?\]?(\s*[=,;])/g, function(all, type, arr, name, sep) {
+  aCode = aCode.replace(/(?:static )?(\w+)((?:\[\])+| ) *(\w+)\[?\]?(\s*[=,;])(.*)/g, function(all, type, arr, name, sep, val) {
     if ( type == "return" )
       return all;
     else
-      return "var " + name + ':' + type + sep;
+      return '<attribute name="' + name + '" type="' + type + '" value="' + val;
   });
 
   // Fix Array[] foo = {...} to [...]
@@ -101,7 +101,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
   function ClassReplace(all, name, extend, vars, last) {
     classes.push( name );
     // Default class
-    if (! extend) extend = 'Processing';
+    if (! extend) extend = 'processingmain';
 
     var _static = "";
 
@@ -112,13 +112,13 @@ var parse = Processing.parse = function parse( aCode, p ) {
 
     // Move arguments up from constructor and wrap contents with
     // a with(this), and unwrap constructor
-    return "class " + name + 
-      (extend ? " extends " + extend : "") + " });" +
+    return '<class name="' + name + 
+      (extend ? '" extends="' + extend + '"': "") + ">\n  " +
       // Replace var foo = 0; with var foo = 0;
       // and force var foo; to become var foo = null;
       vars
         .replace(/,\s?/g, ";\n  var ")
-        .replace(/\b(var |final |public )+\s*/g, "var ")
+        .replace(/\b(var |final |public )+\s*(\w+)(?::\w+|\s)\s*=\s*(.+);/g, '<attribute name="$2" value="$3"/>')
         .replace(/this.(\w+);/g, "this.$1 = null;") + 
         "<CLASS " + name + " " + _static + ">" + (typeof last == "string" ? last : name + "(");
   }
@@ -140,6 +140,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
       
     allRest = allRest.slice( rest.length + 1 );
 
+    // add constructor methods
     rest = rest.replace(new RegExp("\\b" + className + "\\(([^\\)]*?)\\)\\s*{", "g"), function(all, args) {
       args = args.split(/,\s*?/);
       
@@ -148,7 +149,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
       
       var fn = "function " + className + "(" +args.join() + ") {\n    if ( arguments.length == " + args.length + " ) {\n";
         
-      /*
+      /* skip arg unpacking
       for ( var i = 0; i < args.length; i++ ) {
         fn += "    var " + args[i] + " = arguments[" + i + "];\n";
       }
@@ -160,11 +161,11 @@ var parse = Processing.parse = function parse( aCode, p ) {
     // Fix class method names
     // this.collide = function() { ... }
     // and add closing } for with(this) ...
-    rest = rest.replace(/(?:public )?Processing.\w+ = function (\w+)\((.*?)\)/g, function(all, name, args) {
-      return "ADDMETHOD" + name + " (" + args + ")";
+    rest = rest.replace(/(?:public )?Processing.\w+ = <method (\w+)\((.*?)\)/g, function(all, name, args) {
+      return 'ADDMETHODname="' + name + '" args="' + args + '">';
     });
     
-    var matchMethod = /ADDMETHOD([\s\S]*?{)/, mc;
+    var matchMethod = /ADDMETHOD([\s\S]*?)\{/, mc;
     var methods = "";
     
     while ( (mc = rest.match( matchMethod )) ) {
@@ -172,17 +173,18 @@ var parse = Processing.parse = function parse( aCode, p ) {
         allNext = RegExp.rightContext,
         next = nextBrace(allNext);
 
-      methods += "function " + mc[1] + next + "});"
+      methods += "<method " + mc[1] + next + "});"
       
       rest = prev + allNext.slice( next.length + 1 );
     }
 
     rest = methods + rest;
     
-    aCode = left + rest + "\n}}" + staticVars + allRest;
+    aCode = left + rest + "\n  </method>\n</class>" + staticVars + allRest;
   }
 
-  // Do some tidying up, where necessary
+  // TODO: noop  
+  //Do some tidying up, where necessary
   aCode = aCode.replace(/Processing.\w+ = function addMethod/g, "addMethod");
   
   function nextBrace( right ) {
@@ -239,48 +241,66 @@ var parse = Processing.parse = function parse( aCode, p ) {
 
   aCode = aCode.replace(/(extends \w+) }\);/g, "$1 {\n  ");
   aCode = aCode.replace(/(class \w+) }\);/g, "$1 {\n  ");
-  aCode = aCode.replace(/}\);function/g, "}\n  function");
+  aCode = aCode.replace(/}\);function\s+(\w+)\s*\(([^\\)]+).*/g, '</method>\n  <method name="$1" args="$2">');
 
   // Clean up extra spaces after var
   aCode = aCode.replace(/var  /g, "var ");
   // rename top-level Processing methods
   aCode = aCode.replace(/Processing.\w+\s*=\s*/g, "");
 
-  // Find end of top-level class declaration   
-  var matchFirstClass = /([\w\W]+?)\s+class\s+(\w+)/m;
+  // Find end of top-level class declaration and close it
+  var matchFirstClass = /([\w\W]+?)\s+<class\s+(\w+)/m;
   if (result = aCode.match(matchFirstClass)) {
-    aCode = aCode.replace(matchFirstClass, "$1\n}\n\nclass $2");
-
+    aCode = aCode.replace(matchFirstClass, "$1\n</class>\n\n<class $2");
+    // Convert functions to method tags
+    aCode = aCode.replace(/<method\s*(\w+)\s*\(([^\)]*)\)\s*{([^\}]*)\}/mg, function(all, name, args, body) {
+        if ( name == "if" || name == "for" || name == "while" ) {
+            return all;
+        } else {
+            return '<method name="' + name + '" args="' + args + '">' + body + '</method>';
+        }
+    });
+/*
     // point to global context
     var firstclassname = result[2];
-    var findfirstclassconstructor = new RegExp('(function.+?' + firstclassname + '[^\{]+?\{)', 'm');
+    var findfirstclassconstructor = new RegExp('(<method name=".+?' + firstclassname + '[^\{]+?\{)', 'm');
     aCode = aCode.replace(findfirstclassconstructor, "$1\nthis.bind(processingcontext);\n");
+*/
   } else {
     aCode = aCode + '}';
   }
 
-  // Add #pragma 'withThis' to functions
-  aCode = aCode.replace(/(function[^\{]+?\{\s+)/mg, "$1#pragma 'withThis'\n  ");
-
   // new ArrayList(...) -> new ArrayList(...).array
   aCode = aCode.replace(/(new\s+ArrayList[^\)]+?\))/mg, "$1.array");
 
-  var rename = ['int', 'float'];
 
+  // Fix up type annotations
+  var rename = ['int', 'float'];
   for (var i = 0; i < rename.length; i++) {
      var name = rename[i];
      var findrename = new RegExp('([ =])(' + name + '\s*?\\()', 'g');
      aCode = aCode.replace(findrename, "$1_$2");
   }
 
-  // float, int -> number
+  // :float, :int -> :number
   aCode = aCode.replace(/:(float|int)/mg, ":number");
 
+  // "float", "int" -> :number
+  aCode = aCode.replace(/"(float|int)"/mg, '"number"');
+
+  // Close attribute tags
+  aCode = aCode.replace(/value="\s+([\w\.]*)[\s;]*/mg, 'value="$1"/>\n  ');
+
+  // CDATA-fy all methods
+  aCode = aCode.replace(/(<method[^>]*>)([^<]*)(<\/method>)/mg, function(all, opentag, body, closetag) {
+    return opentag + '<![CDATA[' + body + ']]>' + closetag;
+  });
+
   // Add top-level class declaration 
-  aCode = 'class ProcessingMain extends Processing {\n' + aCode;
+  aCode = '<canvas>\n<include href="processing.lzx"/>\n<class name="processingmain" extends="processing">\n  ' + aCode;
 
 //log(aCode);
 
-  return aCode;
+  return aCode + '\n<processingmain width="100" height="100"/>\n\n</canvas>';
 };
 })();
