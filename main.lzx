@@ -1,9 +1,26 @@
 <canvas width="100%" height="600">
-    <script src="processing-laszlo.js" when="immediate"/>
-    <script src="working.js" when="immediate"/>
-    <drawview width="200" height="200">
-        <handler name="oncontext">
-            processingcontext.begin(this);
-        </handler>
-    </drawview>
+    <include href="processing.lzx"/>
+
+    <processing name="bar" width="300" height="300">
+        <attribute name="num" value="20" type="number"/>
+        <attribute name="c" value="0" type="number"/>
+        <method name="setup">
+            size(200,200);
+            fill(255);
+            frameRate(30);
+        </method>
+        <method name="draw">
+            <![CDATA[
+            background(0);
+            c+=0.1;
+            for(var i:number=1; i<height/num; i++) { 
+                var x:number = (c % i)*i*i;
+                stroke(102);
+                line(0, i*num, x, i*num);
+                noStroke();
+                rect(x, i*num-num/2, 8, num);
+            } 
+            ]]>
+        </method>
+    </processing>
 </canvas>

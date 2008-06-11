@@ -273,11 +273,11 @@ var parse = Processing.parse = function parse( aCode, p ) {
      aCode = aCode.replace(findrename, "$1_$2");
   }
 
+  // float, int -> number
+  aCode = aCode.replace(/:(float|int)/mg, ":number");
+
   // Add top-level class declaration 
   aCode = 'class ProcessingMain extends Processing {\n' + aCode;
-
-  // Add global instance
-  aCode = aCode + '\nvar processingcontext = new ProcessingMain();\n';
 
 //log(aCode);
 
