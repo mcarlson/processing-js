@@ -249,7 +249,8 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
   // Find end of top-level class declaration   
   var matchFirstClass = /([\w\W]+?)\s+class\s+(\w+)/m;
   if (result = aCode.match(matchFirstClass)) {
-    aCode = aCode.replace(matchFirstClass, "$1\n</class>\n\n<class $2");
+    aCode = aCode.replace(matchFirstClass, "$1}\n\nclass $2");
+    /*
     // Convert functions to method tags
     aCode = aCode.replace(/<method\s*(\w+)\s*\(([^\)]*)\)\s*{([^\}]*)\}/mg, function(all, name, args, body) {
         if ( name == "if" || name == "for" || name == "while" ) {
@@ -258,12 +259,12 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
             return '<method name="' + name + '" args="' + args + '">' + body + '</method>';
         }
     });
-/*
+
     // point to global context
     var firstclassname = result[2];
     var findfirstclassconstructor = new RegExp('(function.+?' + firstclassname + '[^\{]+?\{)', 'm');
     aCode = aCode.replace(findfirstclassconstructor, "$1\nthis.bind(processingcontext);\n");
-*/
+    */
   } else {
     aCode = aCode + '}';
   }
