@@ -300,51 +300,37 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
 };
 
 var parse = Processing.parse = function parse( aCode, p ) {
-  var aCode = this.parsejs(aCode);  
+  var aCode = Processing.parsejs(aCode);  
 
-  // chunk into classes  
-  var matchClasses = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{([\s\S]+)}\s*(class)?/mg;
+  // chunk into classes based on }} closing marker.
+  var matchClasses = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{([\s\S]+?)\s*}}/mg;
 
-  var processClass = function(all, name, extend, body, after) {
-    body = Processing.processClassBody(body);
-    body = Processing.processClassBody(body);
-
+  var processClass = function(all, name, extend, body) {
     return '<class name="' + name + '"' + 
             (extend ? ' extends="' + extend + '"' : '') + 
-            '>' + body + '</class>';
+            '>' + body + '\n</class>';
   }
 
-  aCode = aCode.replace(matchClasses, processClass);
-
-
-  aCode = aCode.replace(/(<method[^>]*?>)([\s\S]*?)(<\/method>)/mg, function(all, opentag, body, closetag) {
-    return opentag + '<![CDATA[' + body + ']]>' + closetag;
-  });
-
-  // "float", "int" -> :number
-  aCode = aCode.replace(/<\/method>\s*<\/method>/mg, '\n');
+ // aCode = aCode.replace(matchClasses, processClass);
+  //body = Processing.processClassBody(body);
 
   return aCode;
 }
 
 var processClassBody = Processing.processClassBody = function processClassBody( classBody ) {
       // chunk into classes  
-  var matchFunctions = /function\s+(\w+)\s*\(([^\)]*)\)\s*{([\s\S]+?)}\s*(function|<)/mg;
+  var matchFunctions = /(>|function)\s+(\w+)\s*\(([^\)]*)\)\s*{([\s\S]+?)}\s*(function|})/mg;
 
   var processFunction = function(all, name, args, body, after) {
     return '<method name="' + name + '"' + 
             (args ? ' args="' + args + '"' : '') +
             '>' + body + '</method>\n' + after;
   }
+
+  classBody = classBody.replace(matchFunctions, processFunction);
+  classBody = classBody.replace(matchFunctions, processFunction);
+
   return classBody;
-
-  classBody = classBody.replace(matchFunctions, processFunction);
-
-  classBody = classBody.replace(matchFunctions, processFunction);
-
-  return classBody + '</method>';
-
-
 }
 
 })();
