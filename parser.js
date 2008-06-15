@@ -101,7 +101,7 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
   function ClassReplace(all, name, extend, vars, last) {
     classes.push( name );
     // Default class
-    if (! extend) extend = 'Processing';
+    if (! extend) extend = 'processing';
 
     var _static = "";
 
@@ -286,11 +286,6 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
   // "float", "int" -> :number
   aCode = aCode.replace(/"(float|int)"/mg, '"number"');
 
-  // Close attribute tags
-  aCode = aCode.replace(/value="\s+([\w\.]*)[\s;]*/mg, 'value="$1"/>\n  ');
-
-  // CDATA-fy all methods
-
   // Add top-level class declaration 
   aCode = 'class processingmain extends processing {\n' + aCode;
 
@@ -302,35 +297,70 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
 var parse = Processing.parse = function parse( aCode, p ) {
   var aCode = Processing.parsejs(aCode);  
 
+
   // chunk into classes based on }} closing marker.
-  var matchClasses = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{([\s\S]+?)\s*}}/mg;
+  var matchClasses = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{([\s\S]+?)}}/mg;
+
+  var classes = [];
 
   var processClass = function(all, name, extend, body) {
-    return '<class name="' + name + '"' + 
-            (extend ? ' extends="' + extend + '"' : '') + 
-            '>' + body + '\n</class>';
+    classes.push('<class name="' + name + '"' + 
+                 (extend ? ' extends="' + extend + '"' : '') + 
+                 '>' + body + '\n}\n</class>')
   }
+  aCode.replace(matchClasses, processClass);
+  print ('classes' + aCode);
 
- // aCode = aCode.replace(matchClasses, processClass);
-  //body = Processing.processClassBody(body);
+  classes = Processing.processClasses(classes);
 
-  return aCode;
+  return '<canvas>\n<include href="processing.lzx"/>\n' + classes.join('\n') + '</canvas>';
 }
 
-var processClassBody = Processing.processClassBody = function processClassBody( classBody ) {
-      // chunk into classes  
-  var matchFunctions = /(>|function)\s+(\w+)\s*\(([^\)]*)\)\s*{([\s\S]+?)}\s*(function|})/mg;
+var processClasses = Processing.processClasses = function processClasses( classes ) {
 
-  var processFunction = function(all, name, args, body, after) {
-    return '<method name="' + name + '"' + 
-            (args ? ' args="' + args + '"' : '') +
-            '>' + body + '</method>\n' + after;
+  for (var i = 0; i < classes.length; i++) {
+    var clas = classes[i];
+    var methods = []
+    var attributes = []; 
+
+  // chunk into functions  
+  var matchFunctions = /(?:<\/method>)?function\s+(\w+)\s*\(([^\)]*)\)\s*{([\s\S]+?)\s*}\s*/mg;
+
+  var processFunction = function(all, name, args, body) {
+    // Add back missing closing } if needed
+    var leftbraces = body.match(/{/g);
+    leftbraces = leftbraces ? leftbraces.length : 0;
+    var rightbraces = body.match(/}/g);
+    rightbraces = rightbraces ? rightbraces.length : 0;
+    if (rightbraces != leftbraces) {
+        body += '\n}';
+    }
+
+    methods.push('<method name="' + name + '"' + 
+                 (args ? ' args="' + args + '"' : '') +
+                 '>' + body + '\n</method>');
   }
+  //print ('before: ' + clas);
+  clas = clas.replace(matchFunctions, processFunction);
+  
+  // isolate attributes  
+  attrs = clas.replace(/\<method[^<]+<\/method>/mg, '');
+  attrs = attrs.replace(/<(\/)*class[^>]*>/g, ''); 
 
-  classBody = classBody.replace(matchFunctions, processFunction);
-  classBody = classBody.replace(matchFunctions, processFunction);
+  var processAttribute = function(all, name, type, assign, val) {
+    attributes.push('<attribute name="' + name + '"' + (type ? ' type="' + type + '"': '') + (val ? ' value="' + val + '"' : '') + '/>');
+  }
+  var matchAttrs = /var\s+(\w+)\s*:*\s*(\w+)?(\s*=\s*)?(\S)*;/g;
+  attrs = attrs.replace(matchAttrs, processAttribute);
 
-  return classBody;
+  var opentag = clas.match(/(<class[^>]*>)/);
+
+  var methodstr = methods.join('\n');
+
+  var out = opentag[0] + '\n' + attributes.join('\n') + methodstr + '\n</class>\n';
+  classes[i] = out;
+  }
+  return classes;
 }
 
 })();
