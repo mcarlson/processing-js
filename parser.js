@@ -299,7 +299,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
 
 
   // chunk into classes based on }} closing marker.
-  var matchClasses = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{([\s\S]+?)}}/mg;
+  var matchClasses = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{([\s\S]+?)}\s*}/mg;
 
   var classes = [];
 
@@ -309,7 +309,6 @@ var parse = Processing.parse = function parse( aCode, p ) {
                  '>' + body + '\n}\n</class>')
   }
   aCode.replace(matchClasses, processClass);
-  print ('classes' + aCode);
 
   classes = Processing.processClasses(classes);
 
@@ -348,16 +347,16 @@ var processClasses = Processing.processClasses = function processClasses( classe
   attrs = attrs.replace(/<(\/)*class[^>]*>/g, ''); 
 
   var processAttribute = function(all, name, type, assign, val) {
+    if (val.indexOf('new ') != -1) type = 'expression'; 
     attributes.push('<attribute name="' + name + '"' + (type ? ' type="' + type + '"': '') + (val ? ' value="' + val + '"' : '') + '/>');
+    //print("attribute " + all + '\n' + attributes[attributes.length - 1]);
   }
-  var matchAttrs = /var\s+(\w+)\s*:*\s*(\w+)?(\s*=\s*)?(\S)*;/g;
+  var matchAttrs = /var\s+(\w+)\s*:*\s*(\w+)?(\s*=\s*)?([^;]*);/g;
   attrs = attrs.replace(matchAttrs, processAttribute);
 
   var opentag = clas.match(/(<class[^>]*>)/);
 
-  var methodstr = methods.join('\n');
-
-  var out = opentag[0] + '\n' + attributes.join('\n') + methodstr + '\n</class>\n';
+  var out = opentag[0] + '\n' + attributes.join('\n') + '\n' + methods.join('\n') + '\n</class>\n';
   classes[i] = out;
   }
   return classes;
