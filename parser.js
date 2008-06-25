@@ -237,9 +237,9 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
     return ret;
   }
 
-  aCode = aCode.replace(/(extends \w+) }\);/g, "$1 {\n  ");
-  aCode = aCode.replace(/(class \w+) }\);/g, "$1 {\n  ");
-  aCode = aCode.replace(/}\);function/g, "}\n  function");
+  //aCode = aCode.replace(/(extends \w+) }\);/g, "$1 {\n  ");
+  //aCode = aCode.replace(/(class \w+) }\);/g, "$1 {\n  ");
+  //aCode = aCode.replace(/}\);function/g, "}\n  function");
 
   // Clean up extra spaces after var
   aCode = aCode.replace(/var  /g, "var ");
@@ -250,21 +250,6 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
   var matchFirstClass = /([\w\W]+?)\s+class\s+(\w+)/m;
   if (result = aCode.match(matchFirstClass)) {
     aCode = aCode.replace(matchFirstClass, "$1}\n\nclass $2");
-    /*
-    // Convert functions to method tags
-    aCode = aCode.replace(/<method\s*(\w+)\s*\(([^\)]*)\)\s*{([^\}]*)\}/mg, function(all, name, args, body) {
-        if ( name == "if" || name == "for" || name == "while" ) {
-            return all;
-        } else {
-            return '<method name="' + name + '" args="' + args + '">' + body + '</method>';
-        }
-    });
-
-    // point to global context
-    var firstclassname = result[2];
-    var findfirstclassconstructor = new RegExp('(function.+?' + firstclassname + '[^\{]+?\{)', 'm');
-    aCode = aCode.replace(findfirstclassconstructor, "$1\nthis.bind(processingcontext);\n");
-    */
   } else {
     aCode = aCode + '}';
   }
@@ -286,9 +271,21 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
   // "float", "int" -> :number
   aCode = aCode.replace(/"(float|int)"/mg, '"number"');
 
+  // Make sure classes end with }}
+  aCode = aCode.replace(/}\n\n}/g, "}}");
+
+  // Add comments before function declarations
+  aCode = aCode.replace(/function/g, "//BEGIN FUNCTION\nfunction");
+
+
   // Add top-level class declaration 
   aCode = 'class processingmain extends processing {\n' + aCode;
 
+  // Clean up class xxx });
+  aCode = aCode.replace(/(class \w+ .+?)}\);/g, "$1{\n");
+
+  // Clean up   });//BEGIN FUNCTION
+  aCode = aCode.replace(/\s+}\);(\/\/BEGIN FUNCTION)/g, "\n}\n$1");
 //log(aCode);
 
   return aCode;
@@ -297,9 +294,11 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
 var parse = Processing.parse = function parse( aCode, p ) {
   var aCode = Processing.parsejs(aCode);  
 
+  //print('raw js ' + aCode);
+
 
   // chunk into classes based on }} closing marker.
-  var matchClasses = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{([\s\S]+?)}\s*}/mg;
+  var matchClasses = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{([\s\S]+?)}}/mg;
 
   var classes = [];
 
@@ -312,7 +311,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
 
   classes = Processing.processClasses(classes);
 
-  return '<canvas>\n<include href="processing.lzx"/>\n' + classes.join('\n') + '</canvas>';
+  return '<canvas>\n<include href="processing.lzx"/>\n' + classes.join('\n') + '<processingmain width="200" height="200"/></canvas>';
 }
 
 var processClasses = Processing.processClasses = function processClasses( classes ) {
@@ -321,11 +320,13 @@ var processClasses = Processing.processClasses = function processClasses( classe
     var clas = classes[i];
     var methods = []
     var attributes = []; 
+    var initializers = []; 
 
-  // chunk into functions  
-  var matchFunctions = /(?:<\/method>)?function\s+(\w+)\s*\(([^\)]*)\)\s*{([\s\S]+?)\s*}\s*/mg;
+    //print('class ' + clas); 
 
-  var processFunction = function(all, name, args, body) {
+  // chunk into methods  
+  var matchFunctions = /function\s+(\w+)\s*\(([^\)]*)\)\s*{([\s\S]+?)}\s*(\/\/BEGIN FUNCTION|<\/class)/mg;
+  var processFunction = function(all, name, args, body, after) {
     // Add back missing closing } if needed
     var leftbraces = body.match(/{/g);
     leftbraces = leftbraces ? leftbraces.length : 0;
@@ -335,28 +336,48 @@ var processClasses = Processing.processClasses = function processClasses( classe
         body += '\n}';
     }
 
-    methods.push('<method name="' + name + '"' + 
+    // make sure new calls are in the right scope
+    body = body.replace(/(=\s+new\s+)/g, '$1lz.'); 
+
+    var o = '<method name="' + name + '"' + 
                  (args ? ' args="' + args + '"' : '') +
-                 '>' + body + '\n</method>');
+                 '><![CDATA[' + body + '\n]]></method>';
+    methods.push(o)
+    return o;
   }
-  //print ('before: ' + clas);
   clas = clas.replace(matchFunctions, processFunction);
   
   // isolate attributes  
-  attrs = clas.replace(/\<method[^<]+<\/method>/mg, '');
+  attrs = clas.replace(/\<method[^>][\s\S]+?<\/method>/mg, '');
+  //print ('before: ' + clas);
   attrs = attrs.replace(/<(\/)*class[^>]*>/g, ''); 
 
+
+  var matchAttrs = /var\s+(\w+)\s*:*\s*(\w+)?(\s*=\s*)?([^;]*);/g;
   var processAttribute = function(all, name, type, assign, val) {
-    if (val.indexOf('new ') != -1) type = 'expression'; 
+    if ( (val.indexOf('new ') != -1) || (type != 'number') ){
+        //val = null;
+        if (assign) {
+            initializers.push('this.' + name + assign + val);
+        } else {
+            initializers.push('this.' + name + ' = new lz.' + type + '()');
+        }
+        type = 'expression'; 
+        val = null;
+    } else if (type == 'number' && isNaN(Number(val))) {
+        initializers.push('this.' + name + assign + val);
+        val = null
+    }
     attributes.push('<attribute name="' + name + '"' + (type ? ' type="' + type + '"': '') + (val ? ' value="' + val + '"' : '') + '/>');
     //print("attribute " + all + '\n' + attributes[attributes.length - 1]);
   }
-  var matchAttrs = /var\s+(\w+)\s*:*\s*(\w+)?(\s*=\s*)?([^;]*);/g;
   attrs = attrs.replace(matchAttrs, processAttribute);
+
+  var constructor = '<method name="init">\n' + initializers.join('\n') + '\n</method>\n';
 
   var opentag = clas.match(/(<class[^>]*>)/);
 
-  var out = opentag[0] + '\n' + attributes.join('\n') + '\n' + methods.join('\n') + '\n</class>\n';
+  var out = opentag[0] + '\n' + attributes.join('\n') + '\n' + constructor + methods.join('\n') + '\n</class>\n';
   classes[i] = out;
   }
   return classes;
