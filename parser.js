@@ -251,7 +251,7 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
   if (result = aCode.match(matchFirstClass)) {
     aCode = aCode.replace(matchFirstClass, "$1}\n\nclass $2");
   } else {
-    aCode = aCode + '}';
+    aCode = aCode + '\n}';
   }
 
   // new ArrayList(...) -> new ArrayList(...).array
@@ -272,7 +272,7 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
   aCode = aCode.replace(/"(float|int)"/mg, '"number"');
 
   // Make sure classes end with }}
-  aCode = aCode.replace(/}\n\n}/g, "}}");
+  aCode = aCode.replace(/}\n\n+}/g, "}}");
 
   // Add comments before function declarations
   aCode = aCode.replace(/function/g, "//BEGIN FUNCTION\nfunction");
@@ -311,7 +311,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
 
   classes = Processing.processClasses(classes);
 
-  return '<canvas>\n<include href="processing.lzx"/>\n' + classes.join('\n') + '<processingmain width="200" height="200"/></canvas>';
+  return '<canvas title="processing for openlaszlo">\n<include href="processing.lzx"/>\n' + classes.join('\n') + '<processingmain width="300" height="300"/>\n</canvas>';
 }
 
 var processClasses = Processing.processClasses = function processClasses( classes ) {
@@ -338,6 +338,7 @@ var processClasses = Processing.processClasses = function processClasses( classe
 
     // make sure new calls are in the right scope
     body = body.replace(/(=\s+new\s+)/g, '$1lz.'); 
+    body = body.replace(/lz.ArrayList/g, 'ArrayList'); 
 
     var o = '<method name="' + name + '"' + 
                  (args ? ' args="' + args + '"' : '') +
@@ -372,8 +373,9 @@ var processClasses = Processing.processClasses = function processClasses( classe
     //print("attribute " + all + '\n' + attributes[attributes.length - 1]);
   }
   attrs = attrs.replace(matchAttrs, processAttribute);
+  initializers.push('this.begin()');
 
-  var constructor = '<method name="init">\n' + initializers.join('\n') + '\n</method>\n';
+  var constructor = '<method name="presetup" args="ignore">\n' + initializers.join('\n') + '\n</method>\n';
 
   var opentag = clas.match(/(<class[^>]*>)/);
 

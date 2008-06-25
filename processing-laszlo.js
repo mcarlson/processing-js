@@ -11,6 +11,10 @@ class $lzc$class_processing extends $lzc$class_drawview {
   // start up when the context is ready 
   override function construct(parent,args) {
     super.construct(parent, args);
+    new LzDelegate(this, 'presetup', this, 'oncontext')
+  }
+
+  function presetup(ignore) {
   }
 
   // Next two are part of the required LFC tag class protocol
