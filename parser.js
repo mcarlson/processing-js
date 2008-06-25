@@ -31,11 +31,11 @@ function log() {
   }
 }
 
-var parse = Processing.parse = function parse( aCode, p ) {
+var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
   // Angels weep at this parsing code :-(
 
   // Remove end-of-line comments
-  aCode = aCode.replace(/\/\/ .*\n/g, "\n");
+  aCode = aCode.replace(/\s*\/\/ .*\n/g, "\n");
 
   // Weird parsing errors with %
   aCode = aCode.replace(/([^\s])%([^\s])/g, "$1 % $2");
@@ -101,7 +101,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
   function ClassReplace(all, name, extend, vars, last) {
     classes.push( name );
     // Default class
-    if (! extend) extend = 'Processing';
+    if (! extend) extend = 'processing';
 
     var _static = "";
 
@@ -237,9 +237,9 @@ var parse = Processing.parse = function parse( aCode, p ) {
     return ret;
   }
 
-  aCode = aCode.replace(/(extends \w+) }\);/g, "$1 {\n  ");
-  aCode = aCode.replace(/(class \w+) }\);/g, "$1 {\n  ");
-  aCode = aCode.replace(/}\);function/g, "}\n  function");
+  //aCode = aCode.replace(/(extends \w+) }\);/g, "$1 {\n  ");
+  //aCode = aCode.replace(/(class \w+) }\);/g, "$1 {\n  ");
+  //aCode = aCode.replace(/}\);function/g, "}\n  function");
 
   // Clean up extra spaces after var
   aCode = aCode.replace(/var  /g, "var ");
@@ -249,38 +249,138 @@ var parse = Processing.parse = function parse( aCode, p ) {
   // Find end of top-level class declaration   
   var matchFirstClass = /([\w\W]+?)\s+class\s+(\w+)/m;
   if (result = aCode.match(matchFirstClass)) {
-    aCode = aCode.replace(matchFirstClass, "$1\n}\n\nclass $2");
-
-    // point to global context
-    var firstclassname = result[2];
-    var findfirstclassconstructor = new RegExp('(function.+?' + firstclassname + '[^\{]+?\{)', 'm');
-    aCode = aCode.replace(findfirstclassconstructor, "$1\nthis.bind(processingcontext);\n");
+    aCode = aCode.replace(matchFirstClass, "$1}\n\nclass $2");
   } else {
     aCode = aCode + '}';
   }
 
-  // Add #pragma 'withThis' to functions
-  aCode = aCode.replace(/(function[^\{]+?\{\s+)/mg, "$1#pragma 'withThis'\n  ");
-
   // new ArrayList(...) -> new ArrayList(...).array
   aCode = aCode.replace(/(new\s+ArrayList[^\)]+?\))/mg, "$1.array");
 
+  // Fix up type annotations
   var rename = ['int', 'float'];
-
   for (var i = 0; i < rename.length; i++) {
      var name = rename[i];
      var findrename = new RegExp('([ =])(' + name + '\s*?\\()', 'g');
      aCode = aCode.replace(findrename, "$1_$2");
   }
 
+  // :float, :int -> :number
+  aCode = aCode.replace(/:(float|int)/mg, ":number");
+
+  // "float", "int" -> :number
+  aCode = aCode.replace(/"(float|int)"/mg, '"number"');
+
+  // Make sure classes end with }}
+  aCode = aCode.replace(/}\n\n}/g, "}}");
+
+  // Add comments before function declarations
+  aCode = aCode.replace(/function/g, "//BEGIN FUNCTION\nfunction");
+
+
   // Add top-level class declaration 
-  aCode = 'class ProcessingMain extends Processing {\n' + aCode;
+  aCode = 'class processingmain extends processing {\n' + aCode;
 
-  // Add global instance
-  aCode = aCode + '\nvar processingcontext = new ProcessingMain();\n';
+  // Clean up class xxx });
+  aCode = aCode.replace(/(class \w+ .+?)}\);/g, "$1{\n");
 
+  // Clean up   });//BEGIN FUNCTION
+  aCode = aCode.replace(/\s+}\);(\/\/BEGIN FUNCTION)/g, "\n}\n$1");
 //log(aCode);
 
   return aCode;
 };
+
+var parse = Processing.parse = function parse( aCode, p ) {
+  var aCode = Processing.parsejs(aCode);  
+
+  //print('raw js ' + aCode);
+
+
+  // chunk into classes based on }} closing marker.
+  var matchClasses = /class\s+(\w+)(?:\s+extends\s+(\w+))?\s*{([\s\S]+?)}}/mg;
+
+  var classes = [];
+
+  var processClass = function(all, name, extend, body) {
+    classes.push('<class name="' + name + '"' + 
+                 (extend ? ' extends="' + extend + '"' : '') + 
+                 '>' + body + '\n}\n</class>')
+  }
+  aCode.replace(matchClasses, processClass);
+
+  classes = Processing.processClasses(classes);
+
+  return '<canvas>\n<include href="processing.lzx"/>\n' + classes.join('\n') + '<processingmain width="200" height="200"/></canvas>';
+}
+
+var processClasses = Processing.processClasses = function processClasses( classes ) {
+
+  for (var i = 0; i < classes.length; i++) {
+    var clas = classes[i];
+    var methods = []
+    var attributes = []; 
+    var initializers = []; 
+
+    //print('class ' + clas); 
+
+  // chunk into methods  
+  var matchFunctions = /function\s+(\w+)\s*\(([^\)]*)\)\s*{([\s\S]+?)}\s*(\/\/BEGIN FUNCTION|<\/class)/mg;
+  var processFunction = function(all, name, args, body, after) {
+    // Add back missing closing } if needed
+    var leftbraces = body.match(/{/g);
+    leftbraces = leftbraces ? leftbraces.length : 0;
+    var rightbraces = body.match(/}/g);
+    rightbraces = rightbraces ? rightbraces.length : 0;
+    if (rightbraces != leftbraces) {
+        body += '\n}';
+    }
+
+    // make sure new calls are in the right scope
+    body = body.replace(/(=\s+new\s+)/g, '$1lz.'); 
+
+    var o = '<method name="' + name + '"' + 
+                 (args ? ' args="' + args + '"' : '') +
+                 '><![CDATA[' + body + '\n]]></method>';
+    methods.push(o)
+    return o;
+  }
+  clas = clas.replace(matchFunctions, processFunction);
+  
+  // isolate attributes  
+  attrs = clas.replace(/\<method[^>][\s\S]+?<\/method>/mg, '');
+  //print ('before: ' + clas);
+  attrs = attrs.replace(/<(\/)*class[^>]*>/g, ''); 
+
+
+  var matchAttrs = /var\s+(\w+)\s*:*\s*(\w+)?(\s*=\s*)?([^;]*);/g;
+  var processAttribute = function(all, name, type, assign, val) {
+    if ( (val.indexOf('new ') != -1) || (type != 'number') ){
+        //val = null;
+        if (assign) {
+            initializers.push('this.' + name + assign + val);
+        } else {
+            initializers.push('this.' + name + ' = new lz.' + type + '()');
+        }
+        type = 'expression'; 
+        val = null;
+    } else if (type == 'number' && isNaN(Number(val))) {
+        initializers.push('this.' + name + assign + val);
+        val = null
+    }
+    attributes.push('<attribute name="' + name + '"' + (type ? ' type="' + type + '"': '') + (val ? ' value="' + val + '"' : '') + '/>');
+    //print("attribute " + all + '\n' + attributes[attributes.length - 1]);
+  }
+  attrs = attrs.replace(matchAttrs, processAttribute);
+
+  var constructor = '<method name="init">\n' + initializers.join('\n') + '\n</method>\n';
+
+  var opentag = clas.match(/(<class[^>]*>)/);
+
+  var out = opentag[0] + '\n' + attributes.join('\n') + '\n' + constructor + methods.join('\n') + '\n</class>\n';
+  classes[i] = out;
+  }
+  return classes;
+}
+
 })();

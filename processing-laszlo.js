@@ -7,7 +7,16 @@
  * More information: http://processing.org/
  */
 
-class Processing {
+class $lzc$class_processing extends $lzc$class_drawview {
+  // start up when the context is ready 
+  override function construct(parent,args) {
+    super.construct(parent, args);
+  }
+
+  // Next two are part of the required LFC tag class protocol
+  static var tagname = 'processingbase';
+  static var attributes = new LzInheritedHash(LzView.attributes);
+
   // init
   var PI = Math.PI;
   var TWO_PI = 2 * Math.PI;
@@ -85,17 +94,19 @@ class Processing {
   static var mouseButton = 0;
 
   // Will be replaced by the user, most likely
-  static var mouseDragged = undefined;
-  static var mouseMoved = undefined;
-  static var mousePressed = undefined;
-  static var mouseReleased = undefined;
-  static var keyPressed = undefined;
-  static var keyReleased = undefined;
-  static var draw = undefined;
-  static var setup = undefined;
+  static var mouseDragged = null;
+  static var mouseMoved = null;
+  static var mousePressed = null;
+  static var mouseReleased = null;
+  static var keyPressed = null;
+  static var keyReleased = null;
+  static var draw = null;
+  static var setup = null;
 
+  /* inherited from view 
   var width = 0;
   var height = 0;
+  */
 
   // called by init to set up constants
   function setConsts() {
@@ -280,9 +291,9 @@ class Processing {
     LzTimeKernel.clearInterval(looping);
   };
 
-  function save( file ){};
-
 /*
+  override function save( file ){};
+
   function loadImage( file ) {
     var img = document.getElementById(file);
     if ( !img )
@@ -389,10 +400,10 @@ class Processing {
       this.curContext.lineTo( firstX, firstY );
 
       if ( doFill )
-        this.curContext.fill();
+        super.fill();
         
       if ( doStroke )
-        this.curContext.stroke();
+        super.stroke();
     
       this.curContext.closePath();
       curShapeCount = 0;
@@ -401,10 +412,10 @@ class Processing {
 
     if ( pathOpen ) {
       if ( doFill )
-        this.curContext.fill();
+        super.fill();
 
       if ( doStroke )
-        this.curContext.stroke();
+        super.stroke();
 
       this.curContext.closePath();
       curShapeCount = 0;
@@ -588,6 +599,7 @@ class Processing {
   
   function ortho(){};
   
+  /*
   function translate( x, y ) {
     this.curContext.translate( x, y );
   };
@@ -599,7 +611,8 @@ class Processing {
   function rotate( aAngle ) {
     this.curContext.rotate( aAngle );
   };
-  
+  */
+
   function pushMatrix() {
     this.curContext.save();
   };
@@ -609,7 +622,9 @@ class Processing {
   };
   
   function redraw() {
+    //Debug.write('redraw');
     if ( this.hasBackground ) {
+      this.curContext.clear();
       this.background();
     }
 
@@ -628,7 +643,7 @@ class Processing {
 
     var self = this;  
     
-    looping = setInterval(function() {
+    looping = LzTimeKernel.setInterval(function() {
       try {
         self.redraw();
       }
@@ -840,14 +855,14 @@ class Processing {
     this.doLoop = false;
   };
   
-  function fill() {
+  override function fill( ...args ) {
     doFill = true;
-    this.curContext.fillStyle = this.color.setValue( arguments );
+    this.curContext.fillStyle = this.color.setValue( args );
   };
   
-  function stroke() {
+  override function stroke( ...args ) {
     doStroke = true;
-    var col = this.color.setValue(arguments);
+    var col = this.color.setValue(args);
     this.curContext.strokeStyle = col
   };
 
@@ -888,7 +903,7 @@ class Processing {
     }
   };
   
-  function arc( x, y, width, height, start, stop ) {
+  override function arc( x, y, width, height, start, stop ) {
     if ( width <= 0 )
       return;
 
@@ -900,13 +915,13 @@ class Processing {
     this.curContext.beginPath();
   
     this.curContext.moveTo( x, y );
-    this.curContext.arc( x, y, this.curEllipseMode == this.CENTER_RADIUS ? width : width/2, start, stop, false );
+    super.arc( x, y, this.curEllipseMode == this.CENTER_RADIUS ? width : width/2, start, stop, false );
     
     if ( doFill )
-      this.curContext.fill();
+      super.fill();
       
     if ( doStroke )
-      this.curContext.stroke();
+      super.stroke();
     
     this.curContext.closePath();
   };
@@ -918,7 +933,7 @@ class Processing {
     this.curContext.moveTo( x1 || 0, y1 || 0 );
     this.curContext.lineTo( x2 || 0, y2 || 0 );
     
-    this.curContext.stroke();
+    super.stroke();
     
     this.curContext.closePath();
   };
@@ -952,7 +967,7 @@ class Processing {
     this.endShape(null);
   };
   
-  function rect( x, y, width, height ) {
+  override function rect( x, y, width, height ) {
     if ( width == 0 && height == 0 )
       return;
 
@@ -961,22 +976,22 @@ class Processing {
     var offsetStart = 0;
     var offsetEnd = 0;
 
-    if ( curRectMode == this.CORNERS ) {
+    if ( this.curRectMode == this.CORNERS ) {
       width -= x;
       height -= y;
     }
     
-    if ( curRectMode == this.RADIUS ) {
+    if ( this.curRectMode == this.RADIUS ) {
       width *= 2;
       height *= 2;
     }
     
-    if ( curRectMode == this.CENTER || curRectMode == this.RADIUS ) {
+    if ( this.curRectMode == this.CENTER || this.curRectMode == this.RADIUS ) {
       x -= width / 2;
       y -= height / 2;
     }
   
-    this.curContext.rect(
+    super.rect(
       Math.round( x ) - offsetStart,
       Math.round( y ) - offsetStart,
       Math.round( width ) + offsetEnd,
@@ -984,7 +999,7 @@ class Processing {
     );
       
     if ( doFill )
-      this.curContext.fill();
+      super.fill();
       
     if ( doStroke )
       this.curContext.stroke();
@@ -1010,19 +1025,20 @@ class Processing {
     
     // Shortcut for drawing a circle
     if ( width == height )
-      this.curContext.arc( x - offsetStart, y - offsetStart, width / 2, 0, Math.PI * 2, false );
+      super.arc( x - offsetStart, y - offsetStart, width / 2, 0, Math.PI * 2, false );
   
     if ( doFill )
-      this.curContext.fill();
+      super.fill();
       
     if ( doStroke )
-      this.curContext.stroke();
+      super.stroke();
     
     this.curContext.closePath();
   };
 
   function link ( href, target ) {
-    window.location = href;
+    LzBrowser.loadURL(href, target);
+    //window.location = href;
   };
 
   function loadPixels () {
@@ -1079,8 +1095,9 @@ class Processing {
     }
   };
 
-  function begin(el){
-    this.curElement = el;
+  // renamed so it doesn't conflict with the lzx built-in
+  function begin( ignore ){
+    this.curElement = this;
     this.color = new ProcessingColor(this);
     this.setConsts();
     this.stroke( 0 );
@@ -1369,3 +1386,4 @@ class Random {
       }
     };
 };
+lz[$lzc$class_processing.tagname] = $lzc$class_processing;

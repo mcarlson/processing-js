@@ -1,9 +1,29 @@
-<canvas width="100%" height="600">
-    <script src="processing-laszlo.js" when="immediate"/>
-    <script src="working.js" when="immediate"/>
-    <drawview width="200" height="200">
-        <handler name="oncontext">
-            processingcontext.begin(this);
-        </handler>
-    </drawview>
+<canvas title="processing for openlaszlo" width="100%" height="600">
+    <include href="processing.lzx"/>
+
+    <processing width="300" height="300" oncontext="this.begin()">
+        <method name="setup">
+            //size(200, 200);
+            noStroke();
+            smooth();
+            drawCircle(100, 100, 80, 8);
+        </method>
+        <method name="drawCircle" args="x:number, y:number, radius:number, level:number">
+            <![CDATA[
+            var tt:number = 126 * level/6.0;
+            fill(tt, 153);
+            ellipse(x, y, radius*2, radius*2);      
+            if(level > 1) {
+                level = level - 1;
+                var num:number = _int(random(2, 6));
+                for(var i:number=0; i<num; i++) {
+                    var a:number = random(0, TWO_PI);
+                    var nx:number = x + cos(a) * 6.0 * level;
+                    var ny:number = y + sin(a) * 6.0 * level;
+                    drawCircle(nx, ny, radius/2, level);
+                }
+            }
+            ]]>
+        </method>
+    </processing>
 </canvas>

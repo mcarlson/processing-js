@@ -1,0 +1,5 @@
+<library>
+    <include href="extensions/drawview.lzx"/>
+    <interface name="processing" extends="drawview"/>
+    <script src="processing-laszlo.js" when="immediate"/>
+</library>
