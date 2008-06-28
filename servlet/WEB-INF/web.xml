@@ -24,6 +24,11 @@
     </servlet>
 
     <servlet>
+        <servlet-name>ProcessingParser</servlet-name>
+        <servlet-class>org.processr.servlets.ProcessingServlet</servlet-class>
+    </servlet>
+
+    <servlet>
         <servlet-name>AuthenticationServlet</servlet-name>
         <servlet-class>AuthenticationServlet</servlet-class>
     </servlet>
@@ -38,6 +43,11 @@
     <servlet-mapping>
         <servlet-name>LPS</servlet-name>
         <url-pattern>*.lzx</url-pattern>
+    </servlet-mapping>
+
+    <servlet-mapping>
+      <servlet-name>ProcessingParser</servlet-name>
+      <url-pattern>*.processing</url-pattern>
     </servlet-mapping>
 
     <servlet-mapping>
