@@ -311,7 +311,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
 
   classes = Processing.processClasses(classes);
 
-  return '<canvas title="processing for openlaszlo">\n<include href="processing.lzx"/>\n' + classes.join('\n') + '<processingmain width="300" height="300"/>\n</canvas>';
+  return '<canvas title="processing for openlaszlo">\n' + classes.join('\n') + '<processingmain width="300" height="300"/>\n</canvas>';
 }
 
 var processClasses = Processing.processClasses = function processClasses( classes ) {
