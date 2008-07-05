@@ -1342,7 +1342,10 @@ class ProcessingColor {
 class ArrayList {
   var array = null;
 
-  function ArrayList( size, size2, size3 ) {
+  function ArrayList( ...args ) {
+    var size = args[0];
+    var size2 = args[1];
+    var size3 = args[2];
 
     this.array = array = new Array( 0 | size );
     
@@ -1388,8 +1391,11 @@ class ArrayList {
     array.clear = function() {
       this.length = 0;
     };
-    return this;
   };
+
+  function get() {
+    return this.array;
+  }
 }
 
 class Point {
