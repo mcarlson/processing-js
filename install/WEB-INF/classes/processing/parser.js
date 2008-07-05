@@ -254,8 +254,8 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
     aCode = aCode + '\n}';
   }
 
-  // new ArrayList(...) -> new ArrayList(...).array
-  aCode = aCode.replace(/(new\s+ArrayList[^\)]+?\))/mg, "$1.array");
+  // new ArrayList(...) -> new ArrayList(...).get()
+  aCode = aCode.replace(/(new\s+ArrayList[^\)]+?\))/mg, "$1.get()");
 
   // Fix up type annotations
   var rename = ['int', 'float'];
