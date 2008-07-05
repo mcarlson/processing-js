@@ -1,4 +1,5 @@
 /*
+ * Based on:
  * Processing.js - John Resig (http://ejohn.org/)
  * MIT Licensed
  * http://ejohn.org/blog/processingjs/
@@ -7,19 +8,11 @@
  * More information: http://processing.org/
  */
 
-class $lzc$class_processing extends $lzc$class_drawview {
+mixin Processable{
   // start up when the context is ready 
-  override function construct(parent,args) {
-    super.construct(parent, args);
-    new LzDelegate(this, 'presetup', this, 'oncontext')
+  function Processable ( parent:LzNode? = null , attrs:Object? = null , children:Array? = null, instcall:Boolean  = false) {
+    super(parent, attrs, children, instcall);
   }
-
-  function presetup(ignore) {
-  }
-
-  // Next two are part of the required LFC tag class protocol
-  static var tagname = 'processingbase';
-  static var attributes = new LzInheritedHash(LzView.attributes);
 
   // init
   var PI = Math.PI;
@@ -89,6 +82,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
   var curTextFont = "Arial";
   var getLoaded = false;
   var start = (new Date).getTime();
+  var color;
 
   // Global vars for tracking mouse position
   static var pmouseX = 0;
@@ -104,19 +98,17 @@ class $lzc$class_processing extends $lzc$class_drawview {
   static var mouseReleased = null;
   static var keyPressed = null;
   static var keyReleased = null;
-  static var draw = null;
-  static var setup = null;
+  //static var draw = null;
+  //static var setup = null;
+  function setup() {}
+  function presetup(ignore) {}
 
-  /* inherited from view 
   var width = 0;
   var height = 0;
-  */
 
   // called by init to set up constants
   function setConsts() {
     // The height/width of the canvas
-    this.width = this.curElement.width;
-    this.height = this.curElement.height;
     this.curContext = this.curElement;
     this.curRectMode = this.CORNER;
     this.curEllipseMode = this.CENTER;
@@ -160,10 +152,11 @@ class $lzc$class_processing extends $lzc$class_drawview {
       return getImage(this.images[0]).height;
     };
   };
+*/
 
   function buildImageObject( obj ) {
     var pixels = obj.data;
-    var data = this.createImage( obj.width, obj.height );
+    var data = this.createImage( obj.width, obj.height, null );
 
     if ( data.__defineGetter__ && data.__lookupGetter__ && !data.__lookupGetter__("pixels") ) {
       var pixelsDone;
@@ -191,6 +184,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
   }
 
   function createImage( w, h, mode ) {
+    /*
     var data = {};
     data.width = w;
     data.height = h;
@@ -212,16 +206,16 @@ class $lzc$class_processing extends $lzc$class_drawview {
     data.updatePixels = function(){};
 
     return data;
+    */
   };
 
   function createGraphics( w, h ) {
-    var canvas = document.createElement("canvas");
-    var ret = buildProcessing( canvas );
-    ret.size( w, h );
-    ret.canvas = canvas;
-    return ret;
+    //var canvas = document.createElement("canvas");
+    //var ret = buildProcessing( canvas );
+    //ret.size( w, h );
+    //ret.canvas = canvas;
+    //return ret;
   };
-*/
 
   function beginDraw(){};
 
@@ -296,7 +290,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
   };
 
 /*
-  override function save( file ){};
+  function save( file ){};
 
   function loadImage( file ) {
     var img = document.getElementById(file);
@@ -404,10 +398,10 @@ class $lzc$class_processing extends $lzc$class_drawview {
       this.curContext.lineTo( firstX, firstY );
 
       if ( doFill )
-        super.fill();
+        this.curContext.fill();
         
       if ( doStroke )
-        super.stroke();
+        this.curContext.stroke();
     
       this.curContext.closePath();
       curShapeCount = 0;
@@ -416,10 +410,10 @@ class $lzc$class_processing extends $lzc$class_drawview {
 
     if ( pathOpen ) {
       if ( doFill )
-        super.fill();
+        this.curContext.fill();
 
       if ( doStroke )
-        super.stroke();
+        this.curContext.stroke();
 
       this.curContext.closePath();
       curShapeCount = 0;
@@ -603,7 +597,6 @@ class $lzc$class_processing extends $lzc$class_drawview {
   
   function ortho(){};
   
-  /*
   function translate( x, y ) {
     this.curContext.translate( x, y );
   };
@@ -615,7 +608,6 @@ class $lzc$class_processing extends $lzc$class_drawview {
   function rotate( aAngle ) {
     this.curContext.rotate( aAngle );
   };
-  */
 
   function pushMatrix() {
     this.curContext.save();
@@ -636,7 +628,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
     
     inDraw = true;
     this.pushMatrix();
-    this.draw();
+    this['draw']();
     this.popMatrix();
     inDraw = false;
   };
@@ -676,7 +668,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
     
 
     if ( curBackground['img'] ) {
-      this.image( curBackground, 0, 0 );
+      //this.image( curBackground, 0, 0 );
     } else {
       var oldFill = this.curContext.fillStyle;
       this.curContext.fillStyle = curBackground + "";
@@ -859,12 +851,12 @@ class $lzc$class_processing extends $lzc$class_drawview {
     this.doLoop = false;
   };
   
-  override function fill( ...args ) {
+  function fill( ...args ) {
     doFill = true;
     this.curContext.fillStyle = this.color.setValue( args );
   };
   
-  override function stroke( ...args ) {
+  function stroke( ...args ) {
     doStroke = true;
     var col = this.color.setValue(args);
     this.curContext.strokeStyle = col
@@ -897,7 +889,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
 
   function set( x, y, obj ) {
     if ( obj && obj.img ) {
-      this.image( obj, x, y );
+      //this.image( obj, x, y );
     } else {
       var oldFill = this.curContext.fillStyle;
       var color = obj;
@@ -907,7 +899,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
     }
   };
   
-  override function arc( x, y, width, height, start, stop ) {
+  function arc( x, y, width, height, start, stop ) {
     if ( width <= 0 )
       return;
 
@@ -919,13 +911,13 @@ class $lzc$class_processing extends $lzc$class_drawview {
     this.curContext.beginPath();
   
     this.curContext.moveTo( x, y );
-    super.arc( x, y, this.curEllipseMode == this.CENTER_RADIUS ? width : width/2, start, stop, false );
+    this.curContext.arc( x, y, this.curEllipseMode == this.CENTER_RADIUS ? width : width/2, start, stop, false );
     
     if ( doFill )
-      super.fill();
+      this.curContext.fill();
       
     if ( doStroke )
-      super.stroke();
+      this.curContext.stroke();
     
     this.curContext.closePath();
   };
@@ -937,7 +929,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
     this.curContext.moveTo( x1 || 0, y1 || 0 );
     this.curContext.lineTo( x2 || 0, y2 || 0 );
     
-    super.stroke();
+    this.curContext.stroke();
     
     this.curContext.closePath();
   };
@@ -971,7 +963,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
     this.endShape(null);
   };
   
-  override function rect( x, y, width, height ) {
+  function rect( x, y, width, height ) {
     if ( width == 0 && height == 0 )
       return;
 
@@ -995,7 +987,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
       y -= height / 2;
     }
   
-    super.rect(
+    this.curContext.rect(
       Math.round( x ) - offsetStart,
       Math.round( y ) - offsetStart,
       Math.round( width ) + offsetEnd,
@@ -1003,7 +995,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
     );
       
     if ( doFill )
-      super.fill();
+      this.curContext.fill();
       
     if ( doStroke )
       this.curContext.stroke();
@@ -1029,27 +1021,28 @@ class $lzc$class_processing extends $lzc$class_drawview {
     
     // Shortcut for drawing a circle
     if ( width == height )
-      super.arc( x - offsetStart, y - offsetStart, width / 2, 0, Math.PI * 2, false );
+      this.curContext.arc( x - offsetStart, y - offsetStart, width / 2, 0, Math.PI * 2, false );
   
     if ( doFill )
-      super.fill();
+      this.curContext.fill();
       
     if ( doStroke )
-      super.stroke();
+      this.curContext.stroke();
     
     this.curContext.closePath();
   };
 
   function link ( href, target ) {
-    LzBrowser.loadURL(href, target);
+    lz.Browser.loadURL(href, target);
     //window.location = href;
   };
 
   function loadPixels () {
-    this.pixels = buildImageObject( this.curContext.getImageData(0, 0, this.width, this.height) ).pixels;
+    //this.pixels = buildImageObject( this.curContext.getImageData(0, 0, this.width, this.height) ).pixels;
   };
 
   function updatePixels () {
+    /*
     var colors = new RegExp('(d+),(\d+),(\d+),(\d+)');
     var pixels = {};
     pixels.width = this.width;
@@ -1073,6 +1066,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
     }
 
     this.curContext.putImageData(pixels, 0, 0);
+    */
   };
 
   function extendClass( obj, args, fn ) {
@@ -1100,12 +1094,10 @@ class $lzc$class_processing extends $lzc$class_drawview {
   };
 
   // renamed so it doesn't conflict with the lzx built-in
-  function begin( ignore ){
-    this.curElement = this;
-    this.color = new ProcessingColor(this);
-    this.setConsts();
-    this.stroke( 0 );
-    this.fill( 255 );
+  function begin(){
+    //Debug.write('begin', this.curContext, this.curElement);
+    if (! this.curContext) this.curContext = this.curElement;
+    //this.curElement = ctx;
   
     // Canvas has trouble rendering single pixel stuff on whole-pixel
     // counts, so we slightly offset it (this is super lame).
@@ -1126,7 +1118,7 @@ class $lzc$class_processing extends $lzc$class_drawview {
     
     inSetup = false;
     
-    if ( this.draw ) {
+    if ( this['draw'] ) {
       if ( !this.doLoop ) {
         this.redraw();
       } else {
@@ -1224,6 +1216,42 @@ class $lzc$class_processing extends $lzc$class_drawview {
   }
 }
 
+class $lzc$class_processing extends LzNode with Processable {
+  // Next two are part of the required LFC tag class protocol
+  static var tagname = 'processing';
+  static var attributes = new LzInheritedHash(LzNode.attributes);
+  //$lzc$class_processing.attributes.element = null;
+
+  function $lzc$class_processing(parent, attrs, children, async) {
+    super(parent, attrs, children, async);
+  }
+
+  override function construct(parent, attrs) {
+    if (attrs['element'] == null) {
+      attrs.element = new lz.drawview(canvas, {width: 200, height: 200}, null, null);
+    }
+    super.construct(parent, attrs);
+    this.color = new ProcessingColor(this);
+    this.setConsts();
+    //this.stroke( 0 );
+    //this.fill( 255 );
+  }
+
+  function $lzc$set_element(e) { this.setElement(e) }
+  function setElement(c) {
+    //Debug.warn('setContext', c)
+    if (c['context'] == null) {
+      new LzDelegate(this, 'setElement', c, 'oncontext');
+    } else {
+      this.curElement = c;
+      this.width = this.curElement.width;
+      this.height = this.curElement.height;
+      this.curContext = this.curElement;
+      this.presetup(null);
+    }
+  }
+}
+
 // In case I ever need to do HSV conversion:
 // http://srufaculty.sru.edu/david.dailey/javascript/js/5rml.js
 class ProcessingColor {
@@ -1235,12 +1263,16 @@ class ProcessingColor {
         return this.setColor.apply(this, args);
     }
 
-    function setColor(aValue1, aValue2, aValue3, aValue4) {
+    function setColor(...args) {
+    var aValue1 = args[0]
+    var aValue2 = args[1]
+    var aValue3 = args[2]
+    var aValue4 = args[3];
     var aColor = "";
     
-    if ( arguments.length == 3 ) {
+    if ( args.length == 3 ) {
       aColor = this.setColor( aValue1, aValue2, aValue3, this.owner.opacityRange );
-    } else if ( arguments.length == 4 ) {
+    } else if ( args.length == 4 ) {
       var a = aValue4 / this.owner.opacityRange;
       a = isNaN(a) ? 1 : a;
 
@@ -1257,12 +1289,12 @@ class ProcessingColor {
     } else if ( typeof aValue1 == "string" ) {
       aColor = aValue1;
 
-      if ( arguments.length == 1 ) {
+      if ( args.length == 1 ) {
         var c = aColor.split(",");
         c[3] = (aValue2 / this.owner.opacityRange) + ")";
         aColor = c.join(",");
       }
-    } else if ( arguments.length == 2 ) {
+    } else if ( args.length == 2 ) {
       aColor = this.setColor( aValue1, aValue1, aValue1, aValue2 );
     } else if ( typeof aValue1 == "number" ) {
       aColor = this.setColor( aValue1, aValue1, aValue1, this.owner.opacityRange );
@@ -1391,3 +1423,4 @@ class Random {
     };
 };
 lz[$lzc$class_processing.tagname] = $lzc$class_processing;
+

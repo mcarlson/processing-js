@@ -265,11 +265,11 @@ var parsejs = Processing.parsejs = function parsejs( aCode, p ) {
      aCode = aCode.replace(findrename, "$1_$2");
   }
 
-  // :float, :int -> :number
-  aCode = aCode.replace(/:(float|int)/mg, ":number");
+  // :float, :int -> :Number
+  aCode = aCode.replace(/:(float|int)/mg, ":Number");
 
-  // "float", "int" -> :number
-  aCode = aCode.replace(/"(float|int)"/mg, '"number"');
+  // "float", "int" -> :Number
+  aCode = aCode.replace(/"(float|int)"/mg, '"Number"');
 
   // Make sure classes end with }}
   aCode = aCode.replace(/}\n\n+}/g, "}}");
@@ -311,7 +311,7 @@ var parse = Processing.parse = function parse( aCode, p ) {
 
   classes = Processing.processClasses(classes);
 
-  return '<canvas title="processing for openlaszlo">\n' + classes.join('\n') + '<processingmain width="300" height="300"/>\n</canvas>';
+  return '<canvas title="processing for openlaszlo">\n' + classes.join('\n') + '<processingmain/>\n</canvas>';
 }
 
 var processClasses = Processing.processClasses = function processClasses( classes ) {
@@ -339,6 +339,7 @@ var processClasses = Processing.processClasses = function processClasses( classe
     // make sure new calls are in the right scope
     body = body.replace(/(=\s+new\s+)/g, '$1lz.'); 
     body = body.replace(/lz.ArrayList/g, 'ArrayList'); 
+    body = body.replace(/lz.Point/g, 'Point'); 
 
     var o = '<method name="' + name + '"' + 
                  (args ? ' args="' + args + '"' : '') +
@@ -356,7 +357,7 @@ var processClasses = Processing.processClasses = function processClasses( classe
 
   var matchAttrs = /var\s+(\w+)\s*:*\s*(\w+)?(\s*=\s*)?([^;]*);/g;
   var processAttribute = function(all, name, type, assign, val) {
-    if ( (val.indexOf('new ') != -1) || (type != 'number') ){
+    if ( (val.indexOf('new ') != -1) || (type != 'Number') ){
         //val = null;
         if (assign) {
             initializers.push('this.' + name + assign + val);
@@ -365,7 +366,7 @@ var processClasses = Processing.processClasses = function processClasses( classe
         }
         type = 'expression'; 
         val = null;
-    } else if (type == 'number' && isNaN(Number(val))) {
+    } else if (type == 'Number' && isNaN(Number(val))) {
         initializers.push('this.' + name + assign + val);
         val = null
     }

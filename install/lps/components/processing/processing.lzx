@@ -1,5 +1,9 @@
 <library>
     <include href="extensions/drawview.lzx"/>
-    <interface name="processing" extends="drawview"/>
+    <interface name="processing" extends="node">
+        <attribute name="element" value="" type="expression"/>
+        <method name="presetup"/>
+        <method name="setup"/>
+    </interface>
     <script src="processing-laszlo.js" when="immediate"/>
 </library>
