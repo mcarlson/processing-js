@@ -370,17 +370,18 @@ var processClasses = Processing.processClasses = function processClasses( classe
         initializers.push('this.' + name + assign + val);
         val = null
     }
+    if (type == 'Number') type = 'number';
     attributes.push('<attribute name="' + name + '"' + (type ? ' type="' + type + '"': '') + (val ? ' value="' + val + '"' : '') + '/>');
     //print("attribute " + all + '\n' + attributes[attributes.length - 1]);
   }
   attrs = attrs.replace(matchAttrs, processAttribute);
-  initializers.push('this.begin()');
 
-  var constructor = '<method name="presetup" args="ignore">\n' + initializers.join('\n') + '\n</method>\n';
+  var constructor = '';
+  if (initializers.length) constructor += '<method name="presetup">\n' + initializers.join('\n') + '\n</method>\n';
 
   var opentag = clas.match(/(<class[^>]*>)/);
 
-  var out = opentag[0] + '\n' + attributes.join('\n') + '\n' + constructor + methods.join('\n') + '\n</class>\n';
+  var out = opentag[0] + '\n' + attributes.join('\n') + '\n' + constructor + methods.join('\n') + '\n</class>\n\n';
   classes[i] = out;
   }
   return classes;

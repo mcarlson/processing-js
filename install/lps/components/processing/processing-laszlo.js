@@ -101,7 +101,7 @@ mixin Processable{
   //static var draw = null;
   //static var setup = null;
   function setup() {}
-  function presetup(ignore) {}
+  function presetup() {}
 
   var width = 0;
   var height = 0;
@@ -658,23 +658,27 @@ mixin Processable{
   
   function background( ...args ) {
     if ( args.length ) {
+      /*  
       var img = args[0];  
       if ( img && img['img'] ) {
         curBackground = img;
       } else {
+      */  
         curBackground = this.color.setValue( args );
-      }
+      //}
     }
     
 
+/*
     if ( curBackground['img'] ) {
       //this.image( curBackground, 0, 0 );
     } else {
+*/
       var oldFill = this.curContext.fillStyle;
       this.curContext.fillStyle = curBackground + "";
       this.curContext.fillRect( 0, 0, this.width, this.height );
       this.curContext.fillStyle = oldFill;
-    }
+//    }
   };
 
   function sq( aNumber ) {
@@ -825,6 +829,7 @@ mixin Processable{
   };
   
   function size( aWidth, aHeight ) {
+    this.curContext.clear();
     var fillStyle = this.curContext.fillStyle;
     var strokeStyle = this.curContext.strokeStyle;
 
@@ -1095,9 +1100,9 @@ mixin Processable{
 
   // renamed so it doesn't conflict with the lzx built-in
   function begin(){
-    //Debug.write('begin', this.curContext, this.curElement);
     if (! this.curContext) this.curContext = this.curElement;
-    //this.curElement = ctx;
+    this.stroke( 0 );
+    this.fill( 255 );
   
     // Canvas has trouble rendering single pixel stuff on whole-pixel
     // counts, so we slightly offset it (this is super lame).
@@ -1208,6 +1213,7 @@ mixin Processable{
         elem.attachEvent( "on" + type, fn );
     }
     */
+
   }
 
   function bind(processingcontext) {
@@ -1233,8 +1239,6 @@ class $lzc$class_processing extends LzNode with Processable {
     super.construct(parent, attrs);
     this.color = new ProcessingColor(this);
     this.setConsts();
-    //this.stroke( 0 );
-    //this.fill( 255 );
   }
 
   function $lzc$set_element(e) { this.setElement(e) }
@@ -1247,7 +1251,8 @@ class $lzc$class_processing extends LzNode with Processable {
       this.width = this.curElement.width;
       this.height = this.curElement.height;
       this.curContext = this.curElement;
-      this.presetup(null);
+      this.presetup();
+      this.begin();
     }
   }
 }
@@ -1338,6 +1343,7 @@ class ArrayList {
   var array = null;
 
   function ArrayList( size, size2, size3 ) {
+
     this.array = array = new Array( 0 | size );
     
     if ( size2 ) {
