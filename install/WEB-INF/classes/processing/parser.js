@@ -309,6 +309,12 @@ var parse = Processing.parse = function parse( aCode, p ) {
   }
   aCode.replace(matchClasses, processClass);
 
+  // Some processing programs have no methods.  Create a single setup() method
+  if (classes.length == 0) {   
+    aCode = aCode.replace(/{([^}]+)}/g, '{\n//BEGIN FUNCTION\nfunction setup() {\n$1}}\n'); 
+    aCode.replace(matchClasses, processClass);
+  }
+
   classes = Processing.processClasses(classes);
 
   return '<canvas title="processing for openlaszlo">\n' + classes.join('\n') + '<processingmain/>\n</canvas>';
