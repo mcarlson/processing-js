@@ -372,13 +372,13 @@ mixin Processable{
     this.curColorMode = mode;
 
     if ( arguments.length >= 4 ) {
-      redRange = range1;
-      greenRange = range2;
-      blueRange = range3;
+      this.redRange = range1;
+      this.greenRange = range2;
+      this.blueRange = range3;
     }
 
     if ( arguments.length == 5 ) {
-      opacityRange = range4;
+      this.opacityRange = range4;
     }
 
     if ( arguments.length == 2 ) {
